@@ -1,4 +1,3 @@
-// lib/utils/level_utils.dart
 import 'dart:math';
 
 class LevelUtils {
@@ -11,25 +10,27 @@ class LevelUtils {
     return _roundTo50(rawXP);
   }
 
-  // Считает уровень, "срезая" уровни по мере накопления опыта
-  static int getLevelFromXP(int totalXp) {
+  /// Возвращает пару значений: текущий уровень и оставшийся опыт
+  static Map<String, int> _getLevelState(int totalXp) {
     int level = 1;
     int remainingXp = totalXp;
+    
     while (remainingXp >= getRequiredXP(level)) {
       remainingXp -= getRequiredXP(level);
       level++;
     }
-    return level;
+    return {'level': level, 'xp': remainingXp};
   }
 
-  // Считает опыт, который остался на текущем уровне
-  static int getXpInCurrentLevel(int totalXp) {
-    int level = 1;
-    int remainingXp = totalXp;
-    while (remainingXp >= getRequiredXP(level)) {
-      remainingXp -= getRequiredXP(level);
-      level++;
+  static int getLevelFromXP(int totalXp) => _getLevelState(totalXp)['level']!;
+
+  static int getXpInCurrentLevel(int totalXp) => _getLevelState(totalXp)['xp']!;
+
+  static int getTotalXpForLevel(int level) {
+    int total = 0;
+    for (int i = 1; i < level; i++) {
+      total += getRequiredXP(i);
     }
-    return remainingXp;
+    return total;
   }
 }

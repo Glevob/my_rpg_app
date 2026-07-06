@@ -53,68 +53,126 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _toggleTask(int index) {
     setState(() {
-      final task = tasks[index];
-      task.isCompleted = !task.isCompleted;
-      xp += task.isCompleted ? task.experience : -task.experience;
+      // Только меняем статус выполнения. XP не трогаем!
+      tasks[index].isCompleted = !tasks[index].isCompleted;
       _saveData();
     });
   }
 
   void _deleteCompletedTasks() {
+    if (pendingXp == 0) return; // Если задач нет, ничего не делаем
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Подтверждение"),
+          content: Text("Вы хотите сдать $pendingXp XP и удалить выполненные задачи?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Закрыть окно
+              child: const Text("Нет"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрыть окно перед выполнением
+                _performCleanup(); // Вызываем саму логику удаления
+              },
+              child: const Text("Да"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Отдельный метод для самой логики, чтобы не дублировать код
+  void _performCleanup() {
     setState(() {
+      xp += pendingXp;
       tasks.removeWhere((task) => task.isCompleted);
       _saveData();
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Задачи сданы, опыт начислен!")),
+    );
   }
+
+  int get pendingXp => tasks
+    .where((t) => t.isCompleted)
+    .fold(0, (sum, t) => sum + t.experience);
+
+  int get xpAfterCleanup => xp + pendingXp;
 
   @override
   Widget build(BuildContext context) {
-    // 1. Вычисляем текущий уровень
+    // Текущий уровень и прогресс (без учета выполненных заданий)
     final currentLevel = LevelUtils.getLevelFromXP(xp);
-    
-    // 2. Считаем, сколько опыта нужно для следующего уровня
+    final currentLevelXp = LevelUtils.getXpInCurrentLevel(xp);
     final requiredForNext = LevelUtils.getRequiredXP(currentLevel);
 
-    final currentLevelXp = LevelUtils.getXpInCurrentLevel(xp); // Остаток от уровня
+    // Опыт, который мы "заработали", но не "применили"
+    final pending = pendingXp;
     
-    // 3. Считаем, сколько всего опыта нужно было набрать до начала текущего уровня
-    int totalSpentOnPreviousLevels = 0;
-    for (int i = 1; i < currentLevel; i++) {
-      totalSpentOnPreviousLevels += LevelUtils.getRequiredXP(i);
-    }
-    
-    // 4. Опыт, набранный именно на этом уровне
-    final xpInCurrentLevel = xp - totalSpentOnPreviousLevels;
+    // Прогнозируемый уровень (для отображения "Уровень X -> Y")
+    final xpAfterCleanup = xp + pending;
+    final targetLevel = LevelUtils.getLevelFromXP(xpAfterCleanup);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("RPG Task Tracker"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.cleaning_services), 
+            icon: const Icon(Icons.cleaning_services),
             onPressed: _deleteCompletedTasks,
-            tooltip: "Удалить выполненные",
           ),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Text("XP: $currentLevelXp", style: const TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(
+                pending > 0 ? "XP: $currentLevelXp (+$pending)" : "XP: $currentLevelXp",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
       ),
       body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Text("Уровень $currentLevel", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              LinearProgressIndicator(
-                value: currentLevelXp / requiredForNext, 
-                minHeight: 12
-              ),
-              Text("$currentLevelXp / $requiredForNext XP"),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Text(
+                  currentLevel != targetLevel 
+                      ? "Уровень $currentLevel -> $targetLevel" 
+                      : "Уровень $currentLevel",
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Stack(
+                  children: [
+                    // Оранжевая полоса (показывает сколько будет опыта ПОСЛЕ очистки)
+                    // Мы делим на requiredForNext текущего уровня, 
+                    // чтобы видеть, насколько он заполнится.
+                    LinearProgressIndicator(
+                      value: ((currentLevelXp + pending) / requiredForNext).clamp(0.0, 1.0),
+                      minHeight: 12,
+                      color: Colors.orange.withOpacity(0.7),
+                      backgroundColor: Colors.grey[300],
+                    ),
+                    // Фиолетовая полоса (текущий опыт - НИКОГДА не меняется при нажатии на задачу)
+                    LinearProgressIndicator(
+                      value: (currentLevelXp / requiredForNext).clamp(0.0, 1.0),
+                      minHeight: 12,
+                      color: Colors.indigo,
+                      backgroundColor: Colors.transparent,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text("$currentLevelXp / $requiredForNext XP"),
               ],
             ),
           ),
@@ -128,14 +186,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ListTile(
                     onTap: () => _toggleTask(index),
                     leading: Checkbox(
-                      value: task.isCompleted, 
-                      onChanged: (_) => _toggleTask(index)
+                      value: task.isCompleted,
+                      onChanged: (_) => _toggleTask(index),
                     ),
                     title: Text(
-                      task.title, 
+                      task.title,
                       style: TextStyle(
-                        decoration: task.isCompleted ? TextDecoration.lineThrough : null
-                      )
+                        decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                      ),
                     ),
                     trailing: Text("${task.experience} XP"),
                   ),
@@ -147,8 +205,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (_) => AddTaskScreen(onAdd: _addTask))
+          context,
+          MaterialPageRoute(builder: (_) => AddTaskScreen(onAdd: _addTask)),
         ),
         child: const Icon(Icons.add),
       ),
