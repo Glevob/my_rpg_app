@@ -7,6 +7,7 @@ class Task {
   int experience;
   bool isCompleted;
   TaskDifficulty difficulty;
+  DateTime? completedAt;
 
   Task({
     required this.id,
@@ -14,6 +15,7 @@ class Task {
     required this.experience,
     this.isCompleted = false,
     this.difficulty = TaskDifficulty.easy,
+    this.completedAt,
   });
 
   // Преобразование объекта в Map для JSON
@@ -23,6 +25,7 @@ class Task {
     'experience': experience,
     'isCompleted': isCompleted,
     'difficulty': difficulty.index,
+    'completedAt': completedAt,
   };
 
   // Создание объекта из Map
@@ -33,5 +36,6 @@ class Task {
     experience: json['experience'],
     isCompleted: json['isCompleted'] ?? false,
     difficulty: TaskDifficulty.values[json['difficulty'] ?? 0],
+    completedAt: json['completedAt'],
   );
 }

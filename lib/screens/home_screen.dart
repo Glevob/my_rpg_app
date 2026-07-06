@@ -52,12 +52,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _toggleTask(int index) {
-    setState(() {
-      // Только меняем статус выполнения. XP не трогаем!
-      tasks[index].isCompleted = !tasks[index].isCompleted;
-      _saveData();
-    });
-  }
+  setState(() {
+    final task = tasks[index];
+    task.isCompleted = !task.isCompleted;
+    
+    // Если задача выполнена, запоминаем время, иначе обнуляем
+    task.completedAt = task.isCompleted ? DateTime.now() : null;
+    
+    _saveData();
+  });
+}
 
   void _deleteCompletedTasks() {
     if (pendingXp == 0) return; // Если задач нет, ничего не делаем
@@ -87,24 +91,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTaskTile(Task task) {
-    // Находим актуальный индекс задачи в основном списке
     final index = tasks.indexOf(task);
     
-    return Card(
-      color: getDifficultyColor(task.difficulty),
-      child: ListTile(
-        onTap: () => _toggleTask(index),
-        leading: Checkbox(
-          value: task.isCompleted,
-          onChanged: (_) => _toggleTask(index),
-        ),
-        title: Text(
-          task.title,
-          style: TextStyle(
-            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+    return Opacity(
+      // Если задача выполнена, делаем её прозрачность 50%
+      opacity: task.isCompleted ? 0.5 : 1.0,
+      child: Card(
+        color: getDifficultyColor(task.difficulty),
+        child: ListTile(
+          onTap: () => _toggleTask(index),
+          leading: Checkbox(
+            value: task.isCompleted,
+            onChanged: (_) => _toggleTask(index),
           ),
+          title: Text(
+            task.title,
+            style: TextStyle(
+              // Зачеркивание текста остается
+              decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+            ),
+          ),
+          trailing: Text("${task.experience} XP"),
         ),
-        trailing: Text("${task.experience} XP"),
       ),
     );
   }
@@ -140,8 +148,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final targetLevel = LevelUtils.getLevelFromXP(xpAfterCleanup);
 
     // 2. Разделение задач для отображения
-    final incompleteTasks = tasks.where((t) => !t.isCompleted).toList();
-    final completedTasks = tasks.where((t) => t.isCompleted).toList();
+    final incompleteTasks = tasks.where((t) => !t.isCompleted).toList()
+      ..sort((a, b) => b.id.compareTo(a.id)); // Невыполненные как раньше (новые сверху)
+
+    final completedTasks = tasks.where((t) => t.isCompleted).toList()
+      ..sort((a, b) => (a.completedAt ?? DateTime(0))
+          .compareTo(b.completedAt ?? DateTime(0)));
 
     return Scaffold(
       appBar: AppBar(
