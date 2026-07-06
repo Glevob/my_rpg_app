@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/task.dart';
+import '../utils/task_utils.dart';
 
 class AddTaskScreen extends StatefulWidget {
-  final Function(String, int) onAdd;
+  final Function(String, int, TaskDifficulty) onAdd;
 
   const AddTaskScreen({super.key, required this.onAdd});
 
@@ -13,6 +15,7 @@ class AddTaskScreen extends StatefulWidget {
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _xpController = TextEditingController(text: "10");
+  TaskDifficulty _selectedDifficulty = TaskDifficulty.easy;
 
   @override
   void dispose() {
@@ -55,6 +58,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 extentOffset: _xpController.text.length
               ), // Выделяет текст при нажатии — очень удобно!
             ),
+            DropdownButtonFormField<TaskDifficulty>(
+              value: _selectedDifficulty,
+              decoration: const InputDecoration(labelText: 'Сложность'),
+              items: TaskDifficulty.values.map((d) => DropdownMenuItem(
+                value: d, child: Text(difficultyNames[d]!))).toList(),
+              onChanged: (val) => setState(() => _selectedDifficulty = val!),
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
@@ -64,7 +74,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 // Валидация: если текст пустой или опыт не является числом
                 if (title.isEmpty || xp <= 0) return;
 
-                widget.onAdd(title, xp);
+                widget.onAdd(_titleController.text, int.parse(_xpController.text), _selectedDifficulty);
                 Navigator.pop(context);
               },
               child: const Text("Добавить задачу"),
