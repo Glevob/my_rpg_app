@@ -86,6 +86,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildTaskTile(Task task) {
+    // Находим актуальный индекс задачи в основном списке
+    final index = tasks.indexOf(task);
+    
+    return Card(
+      color: getDifficultyColor(task.difficulty),
+      child: ListTile(
+        onTap: () => _toggleTask(index),
+        leading: Checkbox(
+          value: task.isCompleted,
+          onChanged: (_) => _toggleTask(index),
+        ),
+        title: Text(
+          task.title,
+          style: TextStyle(
+            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        trailing: Text("${task.experience} XP"),
+      ),
+    );
+  }
+
   // Отдельный метод для самой логики, чтобы не дублировать код
   void _performCleanup() {
     setState(() {
@@ -107,17 +130,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Текущий уровень и прогресс (без учета выполненных заданий)
+    // 1. Расчеты уровней
     final currentLevel = LevelUtils.getLevelFromXP(xp);
     final currentLevelXp = LevelUtils.getXpInCurrentLevel(xp);
     final requiredForNext = LevelUtils.getRequiredXP(currentLevel);
 
-    // Опыт, который мы "заработали", но не "применили"
     final pending = pendingXp;
-    
-    // Прогнозируемый уровень (для отображения "Уровень X -> Y")
     final xpAfterCleanup = xp + pending;
     final targetLevel = LevelUtils.getLevelFromXP(xpAfterCleanup);
+
+    // 2. Разделение задач для отображения
+    final incompleteTasks = tasks.where((t) => !t.isCompleted).toList();
+    final completedTasks = tasks.where((t) => t.isCompleted).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -126,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.cleaning_services),
             onPressed: _deleteCompletedTasks,
+            tooltip: "Сдать задачи",
           ),
           Center(
             child: Padding(
@@ -153,16 +178,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 10),
                 Stack(
                   children: [
-                    // Оранжевая полоса (показывает сколько будет опыта ПОСЛЕ очистки)
-                    // Мы делим на requiredForNext текущего уровня, 
-                    // чтобы видеть, насколько он заполнится.
                     LinearProgressIndicator(
                       value: ((currentLevelXp + pending) / requiredForNext).clamp(0.0, 1.0),
                       minHeight: 12,
                       color: Colors.orange.withOpacity(0.7),
                       backgroundColor: Colors.grey[300],
                     ),
-                    // Фиолетовая полоса (текущий опыт - НИКОГДА не меняется при нажатии на задачу)
                     LinearProgressIndicator(
                       value: (currentLevelXp / requiredForNext).clamp(0.0, 1.0),
                       minHeight: 12,
@@ -177,28 +198,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: tasks.length,
-              itemBuilder: (context, index) {
-                final task = tasks[index];
-                return Card(
-                  color: getDifficultyColor(task.difficulty),
-                  child: ListTile(
-                    onTap: () => _toggleTask(index),
-                    leading: Checkbox(
-                      value: task.isCompleted,
-                      onChanged: (_) => _toggleTask(index),
-                    ),
-                    title: Text(
-                      task.title,
-                      style: TextStyle(
-                        decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    trailing: Text("${task.experience} XP"),
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 80),
+              children: [
+                // Список невыполненных
+                ...incompleteTasks.map((t) => _buildTaskTile(t)),
+                
+                // Разделитель
+                if (incompleteTasks.isNotEmpty && completedTasks.isNotEmpty)
+                  const Divider(thickness: 2, color: Colors.indigo),
+                if (completedTasks.isNotEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Text("Выполнено", style: TextStyle(color: Colors.grey)),
                   ),
-                );
-              },
+                
+                // Список выполненных
+                ...completedTasks.map((t) => _buildTaskTile(t)),
+              ],
             ),
           ),
         ],
