@@ -18,11 +18,38 @@ class _HomeScreenState extends State<HomeScreen> {
   int xp = 0;
   List<Task> tasks = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
+  List<Category> categories = [
+  Category(name: "Дом", iconCode: Icons.home.codePoint, templates: ["Убраться", "Постирать белье"]),
+  Category(name: "Работа", iconCode: Icons.work.codePoint, templates: ["Отчет", "Встреча"]),
+];
+
+  // 1. Метод сохранения категорий
+Future<void> _saveCategories() async {
+  final prefs = await SharedPreferences.getInstance();
+  // Превращаем список объектов Category в список Map, а затем в строку JSON
+  final encoded = json.encode(categories.map((c) => c.toJson()).toList());
+  await prefs.setString('categories_list', encoded);
+}
+
+// 2. Метод загрузки категорий
+Future<void> _loadCategories() async {
+  final prefs = await SharedPreferences.getInstance();
+  final catsString = prefs.getString('categories_list');
+  if (catsString != null) {
+    setState(() {
+      final List<dynamic> decoded = json.decode(catsString);
+      categories = decoded.map((item) => Category.fromJson(item)).toList();
+    });
   }
+}
+
+// 3. Вызов _loadCategories в initState
+@override
+void initState() {
+  super.initState();
+  _loadData();
+  _loadCategories();
+}
 
   // --- ЛОГИКА ДАННЫХ ---
   Future<void> _saveData() async {
@@ -44,9 +71,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
-  void _addTask(String title, int exp, TaskDifficulty diff) {
+  void _addTask(String title, int exp, TaskDifficulty diff, String? categoryName, int? categoryIconCode) {
     setState(() {
-      tasks.add(Task(id: DateTime.now().toString(), title: title, experience: exp, difficulty: diff));
+      tasks.add(Task(
+        id: DateTime.now().toString(),
+        title: title,
+        experience: exp,
+        difficulty: diff,
+        categoryName: categoryName, // Передаем новые данные
+        categoryIconCode: categoryIconCode,
+      ));
       _saveData();
     });
   }
@@ -235,7 +269,16 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => AddTaskScreen(onAdd: _addTask)),
+          MaterialPageRoute(builder: (_) => AddTaskScreen(
+            onAdd: _addTask, // Теперь сигнатура метода совпадает!
+            categories: categories,
+            onUpdateCategories: (newCats) {
+              setState(() {
+                categories = newCats;
+                _saveCategories(); // Сохраняем при каждом изменении!
+              });
+            },
+          )),
         ),
         child: const Icon(Icons.add),
       ),

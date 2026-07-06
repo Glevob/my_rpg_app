@@ -1,5 +1,22 @@
 // lib/models/task.dart
+import 'package:flutter/material.dart';
+
 enum TaskDifficulty { easy, medium, hard, legendary }
+
+class Category {
+  String name;
+  int iconCode;
+  List<String> templates;
+
+  Category({required this.name, required this.iconCode, required this.templates});
+
+  Map<String, dynamic> toJson() => {'name': name, 'iconCode': iconCode, 'templates': templates};
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+    name: json['name'],
+    iconCode: json['iconCode'],
+    templates: List<String>.from(json['templates']),
+  );
+}
 
 class Task {
   String id;
@@ -8,34 +25,27 @@ class Task {
   bool isCompleted;
   TaskDifficulty difficulty;
   DateTime? completedAt;
+  String? categoryName;
+  int? categoryIconCode;
 
   Task({
-    required this.id,
-    required this.title,
-    required this.experience,
-    this.isCompleted = false,
-    this.difficulty = TaskDifficulty.easy,
-    this.completedAt,
+    required this.id, required this.title, required this.experience,
+    this.isCompleted = false, this.difficulty = TaskDifficulty.easy,
+    this.completedAt, this.categoryName, this.categoryIconCode,
   });
 
-  // Преобразование объекта в Map для JSON
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'experience': experience,
-    'isCompleted': isCompleted,
-    'difficulty': difficulty.index,
-    'completedAt': completedAt,
+    'id': id, 'title': title, 'experience': experience, 'isCompleted': isCompleted,
+    'difficulty': difficulty.index, 'completedAt': completedAt?.toIso8601String(),
+    'categoryName': categoryName, 'categoryIconCode': categoryIconCode,
   };
 
-  // Создание объекта из Map
   factory Task.fromJson(Map<String, dynamic> json) => Task(
-    // Если json['id'] равен null, создаем уникальный ID прямо сейчас
-    id: json['id'] ?? DateTime.now().toString(), 
-    title: json['title'],
-    experience: json['experience'],
+    id: json['id'] ?? DateTime.now().toString(),
+    title: json['title'], experience: json['experience'],
     isCompleted: json['isCompleted'] ?? false,
     difficulty: TaskDifficulty.values[json['difficulty'] ?? 0],
-    completedAt: json['completedAt'],
+    completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
+    categoryName: json['categoryName'], categoryIconCode: json['categoryIconCode'],
   );
 }

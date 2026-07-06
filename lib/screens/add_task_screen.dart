@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/task.dart';
 import '../utils/task_utils.dart';
+import 'category_selection_screen.dart';
 
 class AddTaskScreen extends StatefulWidget {
-  final Function(String, int, TaskDifficulty) onAdd;
+  final Function(String, int, TaskDifficulty, String?, int?) onAdd;
+  final List<Category> categories;
+  final Function(List<Category>) onUpdateCategories;
 
-  const AddTaskScreen({super.key, required this.onAdd});
+  const AddTaskScreen({super.key, required this.onAdd, required this.categories, required this.onUpdateCategories});
 
   @override
   State<AddTaskScreen> createState() => _AddTaskScreenState();
@@ -16,13 +19,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _xpController = TextEditingController(text: "10");
   TaskDifficulty _selectedDifficulty = TaskDifficulty.easy;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _xpController.dispose();
-    super.dispose();
-  }
+  String? _selectedCatName;
+  int? _selectedCatIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -32,52 +30,33 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            TextField(
-              controller: _titleController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: "Название задачи",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _xpController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                LengthLimitingTextInputFormatter(4), // Ограничение: максимум 9999 XP
-                FilteringTextInputFormatter.digitsOnly, // Разрешить только цифры
-              ],
-              decoration: const InputDecoration(
-                labelText: "Количество опыта (XP)",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.star_border), // Добавляем иконку для красоты
-              ),
-              onTap: () => _xpController.selection = TextSelection(
-                baseOffset: 0, 
-                extentOffset: _xpController.text.length
-              ), // Выделяет текст при нажатии — очень удобно!
-            ),
+            TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Название")),
+            TextField(controller: _xpController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "XP")),
             DropdownButtonFormField<TaskDifficulty>(
               value: _selectedDifficulty,
-              decoration: const InputDecoration(labelText: 'Сложность'),
-              items: TaskDifficulty.values.map((d) => DropdownMenuItem(
-                value: d, child: Text(difficultyNames[d]!))).toList(),
+              items: TaskDifficulty.values.map((d) => DropdownMenuItem(value: d, child: Text(difficultyNames[d]!))).toList(),
               onChanged: (val) => setState(() => _selectedDifficulty = val!),
             ),
-            const SizedBox(height: 20),
+            ListTile(
+              leading: Icon(_selectedCatIcon != null ? IconData(_selectedCatIcon!, fontFamily: 'MaterialIcons') : Icons.category),
+              title: Text(_selectedCatName ?? "Выбрать категорию"),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CategorySelectionScreen(
+                categories: widget.categories,
+                onUpdateCategories: widget.onUpdateCategories,
+                onCategorySelected: (name, icon) => setState(() {
+                  _selectedCatName = name;
+                  _selectedCatIcon = icon.codePoint;
+                  _titleController.text = name; // Пример автозаполнения
+                }),
+              ))),
+            ),
             ElevatedButton(
               onPressed: () {
-                final title = _titleController.text.trim();
-                final xp = int.tryParse(_xpController.text.trim()) ?? 0;
-
-                // Валидация: если текст пустой или опыт не является числом
-                if (title.isEmpty || xp <= 0) return;
-
-                widget.onAdd(_titleController.text, int.parse(_xpController.text), _selectedDifficulty);
+                final xp = int.tryParse(_xpController.text) ?? 0;
+                widget.onAdd(_titleController.text, xp, _selectedDifficulty, _selectedCatName, _selectedCatIcon);
                 Navigator.pop(context);
               },
-              child: const Text("Добавить задачу"),
+              child: const Text("Создать"),
             ),
           ],
         ),
