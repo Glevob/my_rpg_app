@@ -23,6 +23,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  void _deleteCompletedTasks() {
+    setState(() {
+      // Оставляем только те задачи, где isCompleted == false
+      tasks.removeWhere((task) => task.isCompleted);
+      _saveData();
+    });
+  }
+
+  void _confirmDelete() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Удалить выполненные?"),
+      content: const Text("Это действие нельзя отменить."),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Отмена")),
+        TextButton(
+          onPressed: () {
+            _deleteCompletedTasks();
+            Navigator.pop(context);
+          },
+          child: const Text("Удалить"),
+        ),
+      ],
+    ),
+  );
+}
+
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('user_xp', xp);
@@ -60,9 +88,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("RPG Task Tracker"), actions: [
-        Center(child: Padding(padding: const EdgeInsets.only(right: 16), child: Text("XP: $xp", style: const TextStyle(fontSize: 18)))),
-      ]),
+      appBar: AppBar(
+        title: const Text("RPG Task Tracker"),
+        actions: [
+          // Кнопка очистки выполненных
+          IconButton(
+            icon: const Icon(Icons.cleaning_services),
+            onPressed: _confirmDelete,
+            tooltip: 'Удалить выполненные',
+          ),
+          // Отображение опыта
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Text("XP: $xp", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
       body: ListView.builder(
         itemCount: tasks.length,
         itemBuilder: (context, index) {
