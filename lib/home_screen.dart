@@ -10,26 +10,39 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int xp = 0;
-  // Список задач: каждая задача — это Map с названием, опытом и статусом
   List<Map<String, dynamic>> tasks = [];
 
-  void _addTask(String title, int exp) {
-    setState(() {
-      tasks.add({'title': title, 'exp': exp, 'isCompleted': false});
+  // Метод для сортировки списка
+  void _sortTasks() {
+    tasks.sort((a, b) {
+      final aDone = a['isCompleted'] as bool;
+      final bDone = b['isCompleted'] as bool;
+      if (aDone == bDone) return 0;
+      return aDone ? 1 : -1;
     });
   }
 
+  // Метод дял добавления задачи
+  void _addTask(String title, int exp) {
+    setState(() {
+      tasks.add({'title': title, 'exp': exp, 'isCompleted': false});
+      _sortTasks();
+    });
+  }
+
+  // Метод выполнения задачи
   void _toggleTask(int index) {
     setState(() {
       final task = tasks[index];
-      // Если задача была не выполнена, начисляем опыт
+      
       if (!task['isCompleted']) {
         xp += task['exp'] as int;
       } else {
-        // Если снимаем отметку, вычитаем опыт
         xp -= task['exp'] as int;
       }
+      
       task['isCompleted'] = !task['isCompleted'];
+      _sortTasks();
     });
   }
 
@@ -49,13 +62,29 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: tasks.length,
         itemBuilder: (context, index) {
           final task = tasks[index];
+          final isDone = task['isCompleted'] as bool;
+          
           return ListTile(
+            key: ValueKey(task.toString() + index.toString()), 
+            onTap: () => _toggleTask(index),
             leading: Checkbox(
-              value: task['isCompleted'],
+              value: isDone,
               onChanged: (_) => _toggleTask(index),
             ),
-            title: Text(task['title']),
-            trailing: Text("${task['exp']} XP"),
+            title: Text(
+              task['title'],
+              style: TextStyle(
+                decoration: isDone ? TextDecoration.lineThrough : null,
+                color: isDone ? Colors.grey : Colors.black,
+              ),
+            ),
+            trailing: Text(
+              "${task['exp']} XP",
+              style: TextStyle(
+                color: isDone ? Colors.grey : Colors.indigo,
+                fontWeight: isDone ? FontWeight.normal : FontWeight.bold,
+              ),
+            ),
           );
         },
       ),

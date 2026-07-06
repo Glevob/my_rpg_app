@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AddTaskScreen extends StatefulWidget {
   final Function(String, int) onAdd;
@@ -11,7 +12,14 @@ class AddTaskScreen extends StatefulWidget {
 
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
-  double _experience = 10;
+  final TextEditingController _xpController = TextEditingController(text: "10");
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _xpController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,26 +31,40 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           children: [
             TextField(
               controller: _titleController,
-              autofocus: true, // Фокус сразу на поле ввода
+              autofocus: true,
               decoration: const InputDecoration(
                 labelText: "Название задачи",
-                border: OutlineInputBorder(), // Красивая рамка
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 20),
-            Text("Опыт: ${_experience.toInt()}", style: const TextStyle(fontSize: 16)),
-            Slider(
-              value: _experience,
-              min: 5, max: 100, divisions: 19,
-              onChanged: (val) => setState(() => _experience = val),
+            TextField(
+              controller: _xpController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(4), // Ограничение: максимум 9999 XP
+                FilteringTextInputFormatter.digitsOnly, // Разрешить только цифры
+              ],
+              decoration: const InputDecoration(
+                labelText: "Количество опыта (XP)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.star_border), // Добавляем иконку для красоты
+              ),
+              onTap: () => _xpController.selection = TextSelection(
+                baseOffset: 0, 
+                extentOffset: _xpController.text.length
+              ), // Выделяет текст при нажатии — очень удобно!
             ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                // Валидация: если текст пустой, ничего не делаем
-                if (_titleController.text.trim().isEmpty) return;
+                final title = _titleController.text.trim();
+                final xp = int.tryParse(_xpController.text.trim()) ?? 0;
 
-                widget.onAdd(_titleController.text.trim(), _experience.toInt());
+                // Валидация: если текст пустой или опыт не является числом
+                if (title.isEmpty || xp <= 0) return;
+
+                widget.onAdd(title, xp);
                 Navigator.pop(context);
               },
               child: const Text("Добавить задачу"),
