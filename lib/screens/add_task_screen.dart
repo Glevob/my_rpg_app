@@ -26,11 +26,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Новая задача")),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Название")),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: "Название"),
+              keyboardType: TextInputType.multiline,
+              maxLines: null, // Позволяет расти полю
+            ),
             TextField(controller: _xpController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "XP")),
             DropdownButtonFormField<TaskDifficulty>(
               value: _selectedDifficulty,

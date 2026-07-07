@@ -152,33 +152,32 @@ void initState() {
   }
 
   Widget _buildTaskTile(Task task) {
-    final index = tasks.indexOf(task);
-    
     return Opacity(
       opacity: task.isCompleted ? 0.5 : 1.0,
       child: Card(
         color: getDifficultyColor(task.difficulty),
         child: ListTile(
-          onTap: () => _toggleTask(index),
+          onTap: () => _toggleTask(tasks.indexOf(task)),
           leading: Checkbox(
             value: task.isCompleted,
-            onChanged: (_) => _toggleTask(index),
+            onChanged: (_) => _toggleTask(tasks.indexOf(task)),
           ),
+          // Используем Align или просто заменяем title на Column, если нужно много места
           title: Text(
             task.title,
             style: TextStyle(
               decoration: task.isCompleted ? TextDecoration.lineThrough : null,
             ),
+            // Эти параметры позволяют тексту переноситься на новые строки
+            softWrap: true,
           ),
-          // --- ДОБАВЛЯЕМ КНОПКУ УДАЛЕНИЯ ---
           trailing: Row(
-            mainAxisSize: MainAxisSize.min, // Чтобы Row не занимал все место
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text("${task.experience} XP"),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                onPressed: () => _deleteTask(task), // Передаем сам объект task
-                tooltip: "Удалить задачу",
+                onPressed: () => _deleteTask(task),
               ),
             ],
           ),
