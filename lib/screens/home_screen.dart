@@ -124,11 +124,37 @@ void initState() {
     );
   }
 
+  void _deleteTask(Task task) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Удалить задачу?"),
+        // Используем название задачи в тексте сообщения
+        content: Text('Вы действительно хотите удалить задачу "${task.title}"? Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text("Отмена")
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                tasks.remove(task); // Удаляем объект напрямую из списка
+                _saveData();
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text("Удалить", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTaskTile(Task task) {
     final index = tasks.indexOf(task);
     
     return Opacity(
-      // Если задача выполнена, делаем её прозрачность 50%
       opacity: task.isCompleted ? 0.5 : 1.0,
       child: Card(
         color: getDifficultyColor(task.difficulty),
@@ -141,17 +167,26 @@ void initState() {
           title: Text(
             task.title,
             style: TextStyle(
-              // Зачеркивание текста остается
               decoration: task.isCompleted ? TextDecoration.lineThrough : null,
             ),
           ),
-          trailing: Text("${task.experience} XP"),
+          // --- ДОБАВЛЯЕМ КНОПКУ УДАЛЕНИЯ ---
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min, // Чтобы Row не занимал все место
+            children: [
+              Text("${task.experience} XP"),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: () => _deleteTask(task), // Передаем сам объект task
+                tooltip: "Удалить задачу",
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Отдельный метод для самой логики, чтобы не дублировать код
   void _performCleanup() {
     setState(() {
       xp += pendingXp;
