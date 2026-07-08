@@ -5,7 +5,7 @@ class TemplateSelectionScreen extends StatefulWidget {
   final Category category;
   final List<Category> allCategories;
   final Function(List<Category>) onUpdateCategories;
-  final Function(String, IconData) onTemplateSelected;
+  final Function(String, IconData, {String? template}) onTemplateSelected;
 
   const TemplateSelectionScreen({super.key, required this.category, required this.allCategories, required this.onUpdateCategories, required this.onTemplateSelected});
 
@@ -79,10 +79,14 @@ class _TemplateSelectionScreenState extends State<TemplateSelectionScreen> {
             },
           ),
           onTap: () {
-            widget.onTemplateSelected(t, IconData(widget.category.iconCode, fontFamily: 'MaterialIcons'));
-            Navigator.pop(context);
-            Navigator.pop(context);
-          },
+            widget.onTemplateSelected(
+              widget.category.name,
+              IconData(widget.category.iconCode, fontFamily: 'MaterialIcons'),
+              template: t
+            );
+            Navigator.pop(context); // Закрываем экран шаблонов
+            Navigator.pop(context); // Закрываем экран категорий
+          }
         )),
         ListTile(leading: const Icon(Icons.add), title: const Text("Добавить шаблон"), onTap: _addTemplate),
       ]),

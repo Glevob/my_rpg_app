@@ -52,6 +52,17 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
   }
 
+  void _setCategory(String name, IconData icon, String? templateTitle) {
+    setState(() {
+      _selectedCatName = name;
+      _selectedCatIcon = icon.codePoint;
+      // Если выбрали шаблон — заполняем поле названия
+      if (templateTitle != null && templateTitle.isNotEmpty) {
+        _titleController.text = templateTitle;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,15 +143,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 title: Text(_selectedCatName ?? "Выбрать категорию"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 onTap: () => Navigator.push(
-                  context, 
+                  context,
                   MaterialPageRoute(builder: (_) => CategorySelectionScreen(
                     categories: widget.categories,
                     onUpdateCategories: widget.onUpdateCategories,
-                    onCategorySelected: (name, icon) => setState(() {
-                      _selectedCatName = name;
-                      _selectedCatIcon = icon.codePoint;
-                    }),
-                  ))
+                    // ВАЖНО: передаем функцию, которая обновляет и имя, и текст в поле
+                    onCategorySelected: (name, icon, {String? template}) { // <--- здесь обязательно {String? template}
+                      setState(() {
+                        _selectedCatName = name;
+                        _selectedCatIcon = icon.codePoint;
+                        if (template != null) _titleController.text = template;
+                      });
+                    },
+                  )),
                 ),
               ),
             ),

@@ -22,11 +22,93 @@ class _HomeScreenState extends State<HomeScreen> {
     Category(name: "Работа", iconCode: Icons.work.codePoint, templates: ["Отчет", "Встреча"]),
   ];
 
+  void _checkLevelUp(int oldXp, int newXp) {
+    final oldLevel = LevelUtils.getLevelFromXP(oldXp);
+    final newLevel = LevelUtils.getLevelFromXP(newXp);
+
+    if (newLevel > oldLevel) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Поздравляем!"),
+          content: Text("Вы перешли на новый уровень!\n\nУровень $oldLevel -> $newLevel"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Круто!"),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadData();
-    _loadCategories();
+    _initApp();
+  }
+
+  Future<void> _initApp() async {
+    await _loadData();
+    await _loadCategories();
+    _processRecurringTasks();
+  }
+
+  // --- ЛОГИКА ПОВТОРЯЮЩИХСЯ ЗАДАЧ ---
+  void _processRecurringTasks() {
+    bool changed = false;
+    DateTime now = DateTime.now();
+
+    for (var task in tasks.where((t) => t.isCompleted && t.recurrence != Recurrence.none).toList()) {
+      if (task.completedAt == null) continue;
+
+      bool shouldRecreate = false;
+
+      switch (task.recurrence) {
+        case Recurrence.daily:
+          // Проверяем, был ли прошлый день другим
+          if (task.completedAt!.day != now.day || task.completedAt!.month != now.month || task.completedAt!.year != now.year) {
+            shouldRecreate = true;
+          }
+          break;
+        case Recurrence.weekly:
+          // Проверяем, прошло ли 7 или более дней
+          if (now.difference(task.completedAt!).inDays >= 7) {
+            shouldRecreate = true;
+          }
+          break;
+        case Recurrence.monthly:
+          // Проверяем, изменился ли месяц
+          if (task.completedAt!.month != now.month || task.completedAt!.year != now.year) {
+            shouldRecreate = true;
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (shouldRecreate) {
+        tasks.add(Task(
+          id: DateTime.now().toString(),
+          title: task.title,
+          experience: task.experience,
+          difficulty: task.difficulty,
+          categoryName: task.categoryName,
+          categoryIconCode: task.categoryIconCode,
+          recurrence: task.recurrence,
+          isCompleted: false,
+          dueDate: now.add(const Duration(days: 1)), // Устанавливаем новый дедлайн
+        ));
+        tasks.remove(task);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      _saveData();
+      setState(() {});
+    }
   }
 
   // --- ЛОГИКА ДАННЫХ ---
@@ -66,27 +148,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
-  void _addTask(String title, int exp, TaskDifficulty diff, String? categoryName, int? categoryIconCode, DateTime? dueDate, Recurrence recurrence) {
-  setState(() {
-    tasks.add(Task(
-      id: DateTime.now().toString(),
-      title: title,
-      experience: exp,
-      difficulty: diff,
-      categoryName: categoryName,
-      categoryIconCode: categoryIconCode,
-      dueDate: dueDate,
-      recurrence: recurrence,
-    ));
-    _saveData();
-  });
-}
+  void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence) {
+    setState(() {
+      tasks.add(Task(
+        id: DateTime.now().toString(),
+        title: title,
+        experience: exp,
+        difficulty: diff,
+        categoryName: catName,
+        categoryIconCode: catIcon,
+        dueDate: dueDate,
+        recurrence: recurrence,
+      ));
+      _saveData();
+    });
+  }
 
   void _toggleTask(int index) {
     final task = tasks[index];
-    
-    // Если задача просрочена, не даем менять её статус
-    if (task.isOverdue) return;
+    if (task.isOverdue) return; // Запрет выполнения просроченных
 
     setState(() {
       task.isCompleted = !task.isCompleted;
@@ -100,22 +180,24 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Удалить задачу?"),
-        content: Text('Вы действительно хотите удалить задачу "${task.title}"?'),
+        content: Text('Удалить "${task.title}"?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Отмена")),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                tasks.remove(task);
-                _saveData();
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text("Удалить", style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () {
+            setState(() => tasks.remove(task));
+            _saveData();
+            Navigator.pop(ctx);
+          }, child: const Text("Удалить", style: TextStyle(color: Colors.red))),
         ],
       ),
     );
+  }
+
+  void _updateCategories(List<Category> newCats) {
+    setState(() {
+      categories = newCats;
+    });
+    _saveCategories(); // Сохраняем в SharedPreferences каждый раз при изменении
   }
 
   void _deleteCompletedTasks() {
@@ -137,11 +219,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _performCleanup() {
+    final oldXp = xp;
+    final earnedXp = pendingXp;
+    
     setState(() {
-      xp += pendingXp;
+      xp += earnedXp;
       tasks.removeWhere((task) => task.isCompleted);
       _saveData();
     });
+
+    // Вызываем проверку после обновления состояния
+    _checkLevelUp(oldXp, xp);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Задачи сданы, опыт начислен!")),
+    );
   }
 
   // --- ВИДЖЕТЫ ---
@@ -152,42 +244,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
       color: overdue ? Colors.red[50] : getDifficultyColor(task.difficulty),
       child: ListTile(
-        onTap: overdue ? null : () => _toggleTask(tasks.indexOf(task)), // Блокируем нажатие
-        leading: Checkbox(
-          value: task.isCompleted || overdue, // Чекбокс активен, если выполнено или просрочено
-          onChanged: overdue ? null : (_) => _toggleTask(tasks.indexOf(task)),
-        ),
+        onTap: overdue ? null : () => _toggleTask(tasks.indexOf(task)),
+        leading: Checkbox(value: task.isCompleted || overdue, onChanged: overdue ? null : (_) => _toggleTask(tasks.indexOf(task))),
         title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            task.title,
-            style: TextStyle(
-              // Зачеркиваем, если выполнено ИЛИ просрочено
-              decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null,
-              color: overdue ? Colors.red : Colors.black, // Красный текст для просроченных
-              fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          if (overdue)
-            const Text("ПРОСРОЧЕНО", style: TextStyle(fontSize: 10, color: Colors.red)),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(task.title, style: TextStyle(decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null)),
             if (task.dueDate != null || task.recurrence != Recurrence.none)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    if (task.dueDate != null)
-                      Text(
-                        dateFormat.format(task.dueDate!),
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
-                      ),
-                    if (task.dueDate != null && task.recurrence != Recurrence.none)
-                      const Text(" • "),
+                    if (task.dueDate != null) Text(dateFormat.format(task.dueDate!), style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    if (task.dueDate != null && task.recurrence != Recurrence.none) const Text(" • "),
                     if (task.recurrence != Recurrence.none)
-                      Text(
-                        task.recurrence.nameRu,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
-                      ),
+                      Text(task.recurrence.nameRu, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                    if (overdue) const Text(" • ПРОСРОЧЕНО", style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -214,40 +286,44 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentLevel = LevelUtils.getLevelFromXP(xp);
     final currentLevelXp = LevelUtils.getXpInCurrentLevel(xp);
     final requiredForNext = LevelUtils.getRequiredXP(currentLevel);
-    final pending = pendingXp;
+    final pending = pendingXp; // XP за выполненные, но не сданные задачи
     final targetLevel = LevelUtils.getLevelFromXP(xp + pending);
 
-    final incompleteTasks = tasks.where((t) => !t.isCompleted).toList()..sort((a, b) => b.id.compareTo(a.id));
-    final completedTasks = tasks.where((t) => t.isCompleted).toList()..sort((a, b) => (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0)));
+    // Разделение и сортировка
+    final incomplete = tasks.where((t) => !t.isCompleted).toList()..sort((a, b) => b.id.compareTo(a.id));
+    final completed = tasks.where((t) => t.isCompleted).toList()..sort((a, b) => (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0)));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("RPG Task Tracker"),
-        actions: [
-          IconButton(icon: const Icon(Icons.cleaning_services), onPressed: _deleteCompletedTasks),
-        ],
-      ),
+      appBar: AppBar(title: const Text("RPG Task Tracker"), actions: [
+        IconButton(icon: const Icon(Icons.cleaning_services), onPressed: _performCleanup),
+      ]),
       body: Column(
         children: [
-          // Блок прогресс-бара уровня
+          // Блок уровня и опыта
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Text("Уровень ${currentLevel != targetLevel ? '$currentLevel -> $targetLevel' : currentLevel}",
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                LinearProgressIndicator(value: (currentLevelXp / requiredForNext).clamp(0.0, 1.0), minHeight: 12),
-                Text("$currentLevelXp / $requiredForNext XP"),
-              ],
-            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(children: [
+              Text(
+                currentLevel != targetLevel 
+                    ? "Уровень $currentLevel -> $targetLevel | XP: $currentLevelXp / $requiredForNext"
+                    : "Уровень $currentLevel | XP: $currentLevelXp / $requiredForNext",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Stack(children: [
+                LinearProgressIndicator(value: ((currentLevelXp + pending) / requiredForNext).clamp(0.0, 1.0), minHeight: 10, color: Colors.orange.withOpacity(0.7)),
+                LinearProgressIndicator(value: (currentLevelXp / requiredForNext).clamp(0.0, 1.0), minHeight: 10, color: Colors.indigo, backgroundColor: Colors.transparent),
+              ]),
+            ]),
           ),
+          
+          // Список задач
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 80),
               children: [
-                ...incompleteTasks.map((t) => _buildTaskTile(t)),
-                if (incompleteTasks.isNotEmpty && completedTasks.isNotEmpty) const Divider(),
-                ...completedTasks.map((t) => _buildTaskTile(t)),
+                ...incomplete.map(_buildTaskTile),
+                if (incomplete.isNotEmpty && completed.isNotEmpty) const Divider(thickness: 2),
+                ...completed.map((t) => Opacity(opacity: 0.5, child: _buildTaskTile(t))), // Тусклые выполненные
               ],
             ),
           ),
@@ -257,12 +333,10 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddTaskScreen(
           onAdd: _addTask,
           categories: categories,
-          onUpdateCategories: (newCats) {
-            setState(() {
-              categories = newCats;
-              _saveCategories();
-            });
-          },
+          onUpdateCategories: (newCats) => setState(() {
+            categories = newCats;
+            _saveCategories();
+          }),
         ))),
         child: const Icon(Icons.add),
       ),

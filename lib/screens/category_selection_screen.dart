@@ -5,7 +5,7 @@ import 'template_selection_screen.dart';
 class CategorySelectionScreen extends StatefulWidget {
   final List<Category> categories;
   final Function(List<Category>) onUpdateCategories;
-  final Function(String, IconData) onCategorySelected;
+  final Function(String, IconData, {String? template}) onCategorySelected;
 
   const CategorySelectionScreen({
     super.key,
