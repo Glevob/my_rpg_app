@@ -6,6 +6,7 @@ import '../utils/task_utils.dart';
 import '../utils/level_utils.dart';
 import 'add_task_screen.dart';
 import 'package:intl/intl.dart';
+import 'recurring_tasks_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,6 +56,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _processRecurringTasks();
   }
 
+  DateTime _calculateNextOccurrence(Task task) {
+    DateTime now = DateTime.now();
+    switch (task.recurrence) {
+      case Recurrence.daily:
+        return DateTime(now.year, now.month, now.day + 1, 0, 0);
+      case Recurrence.weekly:
+        // Следующий понедельник 00:00
+        int daysUntilMonday = 8 - now.weekday;
+        return DateTime(now.year, now.month, now.day + daysUntilMonday, 0, 0);
+      case Recurrence.monthly:
+        // 1-е число следующего месяца 00:00
+        return DateTime(now.year, now.month + 1, 1, 0, 0);
+      default:
+        return now;
+    }
+  } 
+
   // --- ЛОГИКА ПОВТОРЯЮЩИХСЯ ЗАДАЧ ---
   void _processRecurringTasks() {
     bool changed = false;
@@ -72,22 +90,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // 2. Если задача повторяющаяся, создаем её копию на следующий цикл
       if (task.recurrence != Recurrence.none) {
-        DateTime nextDueDate = _calculateNextDueDate(task); // Нужно реализовать этот метод
-        tasks.add(Task(
-          id: DateTime.now().millisecondsSinceEpoch.toString() + task.title,
-          title: task.title,
-          experience: task.experience,
-          difficulty: task.difficulty,
-          categoryName: task.categoryName,
-          categoryIconCode: task.categoryIconCode,
-          recurrence: task.recurrence,
-          isCompleted: false,
-          dueDate: nextDueDate,
-        ));
+        // Задаче, которая была выполнена, назначаем дату следующего появления
+        task.nextOccurrence = _calculateNextOccurrence(task);
+        task.isCompleted = false; // Сбрасываем статус
+        task.completedAt = null;
+        task.dueDate = _calculateNextDueDate(task); // Новый дедлайн
+        // ВАЖНО: Мы НЕ добавляем её в tasks, если она должна появиться позже
+      } else {
+        tasks.remove(task); // Обычные задачи просто удаляются
       }
 
-      // 3. Удаляем старую выполненную задачу
-      tasks.remove(task);
       changed = true;
     }
 
@@ -102,6 +114,26 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+  }
+
+  // Активация задач, чей день настал
+  void _checkAndGenerateTasks() {
+    DateTime now = DateTime.now();
+    bool added = false;
+
+    // Ищем задачи, которые были "отложены" (nextOccurrence не null и уже наступил)
+    // Для этого вам нужно хранить где-то список "будущих" задач или сканировать существующие
+    // Проще всего: при выполнении задачи мы НЕ удаляем её, а прячем (isCompleted = false, nextOccurrence = дата)
+    
+    // В данном случае, если вы храните все задачи в списке tasks:
+    for (var task in tasks.where((t) => !t.isCompleted && t.nextOccurrence != null).toList()) {
+      if (now.isAfter(task.nextOccurrence!)) {
+        task.nextOccurrence = null; // Делаем активной
+        added = true;
+      }
+    }
+    
+    if (added) setState(() {});
   }
 
   // Вспомогательный метод для расчета следующей даты
@@ -318,13 +350,69 @@ class _HomeScreenState extends State<HomeScreen> {
     final targetLevel = LevelUtils.getLevelFromXP(xp + pending);
 
     // Разделение и сортировка
-    final incomplete = tasks.where((t) => !t.isCompleted).toList()..sort((a, b) => b.id.compareTo(a.id));
-    final completed = tasks.where((t) => t.isCompleted).toList()..sort((a, b) => (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0)));
+    // Сначала фильтруем только те, которые должны быть видны сейчас
+    final visibleTasks = tasks.where((t) => 
+      t.nextOccurrence == null || DateTime.now().isAfter(t.nextOccurrence!)
+    ).toList();
+
+    // Теперь разделяем отфильтрованные задачи
+    final incomplete = visibleTasks.where((t) => !t.isCompleted).toList()
+      ..sort((a, b) => b.id.compareTo(a.id));
+      
+    final completed = visibleTasks.where((t) => t.isCompleted).toList()
+      ..sort((a, b) => (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0)));
 
     return Scaffold(
-      appBar: AppBar(title: const Text("RPG Task Tracker"), actions: [
-        IconButton(icon: const Icon(Icons.cleaning_services), onPressed: _performCleanup),
-      ]),
+          appBar: AppBar(
+            title: const Text("RPG Task Tracker"),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.cleaning_services), 
+                onPressed: _performCleanup
+              ),
+              
+              // Новое меню в углу
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'recurring') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RecurringTasksScreen(
+                          tasks: tasks,
+                          onUpdate: () {
+                            _saveData();
+                            setState(() {});
+                          },
+                        ),
+                      ),
+                    );
+                  }
+                  // Сюда в будущем можно добавлять другие пункты:
+                  // else if (value == 'settings') { ... }
+                },
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem<String>(
+                    value: 'recurring',
+                    child: ListTile(
+                      leading: Icon(Icons.loop),
+                      title: Text('Повторяющиеся задачи'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  // Сюда можно добавить новые пункты меню в будущем:
+                  // const PopupMenuItem<String>(
+                  //   value: 'settings',
+                  //   child: ListTile(
+                  //     leading: Icon(Icons.settings),
+                  //     title: Text('Настройки'),
+                  //     contentPadding: EdgeInsets.zero,
+                  //   ),
+                  // ),
+                ],
+              ),
+            ],
+          ),
       body: Column(
         children: [
           // Блок уровня и опыта

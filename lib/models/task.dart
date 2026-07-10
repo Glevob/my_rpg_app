@@ -44,12 +44,14 @@ class Task {
   bool get isOverdue {
     return dueDate != null && dueDate!.isBefore(DateTime.now()) && !isCompleted;
   }
+  DateTime? nextOccurrence;
 
   Task({
     required this.id, required this.title, required this.experience,
     this.isCompleted = false, this.difficulty = TaskDifficulty.easy,
     this.completedAt, this.categoryName, this.categoryIconCode,
     this.dueDate, this.recurrence = Recurrence.none,
+    this.nextOccurrence,
   });
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +59,7 @@ class Task {
     'difficulty': difficulty.index, 'completedAt': completedAt?.toIso8601String(),
     'categoryName': categoryName, 'categoryIconCode': categoryIconCode,
     'dueDate': dueDate?.toIso8601String(), 'recurrence': recurrence.index,
+    'nextOccurrence': nextOccurrence?.toIso8601String(),
   };
 
   factory Task.fromJson(Map<String, dynamic> json) => Task(
@@ -68,5 +71,6 @@ class Task {
     categoryName: json['categoryName'], categoryIconCode: json['categoryIconCode'],
     dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
     recurrence: Recurrence.values[json['recurrence'] ?? 0],
+    nextOccurrence: json['nextOccurrence'] != null ? DateTime.parse(json['nextOccurrence']) : null,
   );
 }
