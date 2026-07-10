@@ -8,6 +8,7 @@ import 'add_task_screen.dart';
 import 'package:intl/intl.dart';
 import 'recurring_tasks_screen.dart';
 import 'statistics_screen.dart';
+import 'xp_settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -410,7 +411,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       archive: completedArchive,
                       totalXp: xp,
                     )));
-                  }
+                  } else if (value == 'settings_xp'){
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const XpSettingsScreen()),
+                      );
+                    }
                 },
                 itemBuilder: (BuildContext context) => [
                   const PopupMenuItem<String>(
@@ -420,6 +426,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const PopupMenuItem<String>(
                     value: 'stats',
                     child: ListTile(leading: Icon(Icons.bar_chart), title: Text('Статистика')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'settings_xp',
+                    child: Text("Настройка опыта (XP)"),
                   ),
                 ],
               ),
