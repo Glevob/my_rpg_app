@@ -9,6 +9,13 @@ const Map<TaskDifficulty, String> difficultyNames = {
   TaskDifficulty.legendary: 'Легендарная',
 };
 
+const Map<TaskDifficulty, int> difficultyXpMap = {
+  TaskDifficulty.easy: 10,
+  TaskDifficulty.medium: 50,
+  TaskDifficulty.hard: 100,
+  TaskDifficulty.legendary: 250,
+};
+
 Color getDifficultyColor(TaskDifficulty difficulty) {
   switch (difficulty) {
     case TaskDifficulty.easy: return Colors.white;

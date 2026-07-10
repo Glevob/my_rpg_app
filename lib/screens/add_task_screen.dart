@@ -24,7 +24,6 @@ class AddTaskScreen extends StatefulWidget {
 
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _xpController = TextEditingController(text: "10");
   TaskDifficulty _selectedDifficulty = TaskDifficulty.easy;
   String? _selectedCatName;
   int? _selectedCatIcon;
@@ -87,17 +86,26 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               minLines: 3,
             ),
             const SizedBox(height: 15),
-            
-            // Поле для XP
-            TextField(
-              controller: _xpController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Опыт (XP)",
-                border: OutlineInputBorder(),
+
+            // Выбор сложности
+            DropdownButtonFormField<TaskDifficulty>(
+              value: _selectedDifficulty,
+              decoration: const InputDecoration(labelText: "Сложность", border: OutlineInputBorder()),
+              items: TaskDifficulty.values.map((d) => DropdownMenuItem(
+                value: d, 
+                child: Text(difficultyNames[d] ?? d.name)
+              )).toList(),
+              onChanged: (val) => setState(() => _selectedDifficulty = val!),
+            ),
+            // Информационный текст про XP
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                "Награда: ${difficultyXpMap[_selectedDifficulty]} XP",
+                style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
               ),
             ),
-
+          
             // Выбор даты/времени
             ListTile(
               title: Text(_selectedDateTime == null ? "Дата и время" : DateFormat('dd.MM.yyyy HH:mm').format(_selectedDateTime!)),
@@ -115,21 +123,6 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               onChanged: (val) => setState(() => _selectedRecurrence = val!),
             ),
 
-            const SizedBox(height: 15),
-            
-            // Выбор сложности
-            DropdownButtonFormField<TaskDifficulty>(
-              value: _selectedDifficulty,
-              decoration: const InputDecoration(
-                labelText: "Сложность",
-                border: OutlineInputBorder(),
-              ),
-              items: TaskDifficulty.values.map((d) => DropdownMenuItem(
-                value: d, 
-                child: Text(difficultyNames[d] ?? d.toString())
-              )).toList(),
-              onChanged: (val) => setState(() => _selectedDifficulty = val!),
-            ),
             const SizedBox(height: 15),
             
             // Выбор категории
@@ -162,13 +155,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             const SizedBox(height: 30),
             
             // Кнопка сохранения
-            // Кнопка сохранения
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
               onPressed: () {
-                final xp = int.tryParse(_xpController.text) ?? 0;
+                final xp = difficultyXpMap[_selectedDifficulty] ?? 0;
                 if (_titleController.text.isNotEmpty) {
                   widget.onAdd(
                     _titleController.text, 

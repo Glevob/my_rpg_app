@@ -68,7 +68,6 @@ class StatisticsScreen extends StatelessWidget {
 
   Widget _buildSummaryCard(String title, String value, IconData icon) {
     return Card(
-      color: Colors.indigo.withOpacity(0.05),
       child: ListTile(
         leading: Icon(icon, color: Colors.indigo),
         title: Text(title),
