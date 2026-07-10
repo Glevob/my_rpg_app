@@ -7,6 +7,7 @@ import '../utils/level_utils.dart';
 import 'add_task_screen.dart';
 import 'package:intl/intl.dart';
 import 'recurring_tasks_screen.dart';
+import 'statistics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Category(name: "Дом", iconCode: Icons.home.codePoint, templates: ["Убраться", "Постирать белье"]),
     Category(name: "Работа", iconCode: Icons.work.codePoint, templates: ["Отчет", "Встреча"]),
   ];
+  List<Task> completedArchive = [];
 
   void _checkLevelUp(int oldXp, int newXp) {
     final oldLevel = LevelUtils.getLevelFromXP(oldXp);
@@ -97,9 +99,10 @@ class _HomeScreenState extends State<HomeScreen> {
         task.dueDate = _calculateNextDueDate(task); // Новый дедлайн
         // ВАЖНО: Мы НЕ добавляем её в tasks, если она должна появиться позже
       } else {
-        tasks.remove(task); // Обычные задачи просто удаляются
+        // РАЗОВЫЕ: ПЕРЕНОСИМ В АРХИВ
+        completedArchive.add(task); 
+        tasks.remove(task);
       }
-
       changed = true;
     }
 
@@ -176,6 +179,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('user_xp', xp);
     await prefs.setString('tasks_list', json.encode(tasks.map((t) => t.toJson()).toList()));
+    // Сохранение архива
+    await prefs.setString('archive_list', json.encode(completedArchive.map((t) => t.toJson()).toList()));
   }
 
   Future<void> _loadData() async {
@@ -187,8 +192,15 @@ class _HomeScreenState extends State<HomeScreen> {
         final List<dynamic> decoded = json.decode(tasksString);
         tasks = decoded.map((item) => Task.fromJson(item)).toList();
       }
+      // Загрузка архива
+      final archiveString = prefs.getString('archive_list');
+      if (archiveString != null) {
+        final List<dynamic> decoded = json.decode(archiveString);
+        completedArchive = decoded.map((item) => Task.fromJson(item)).toList();
+      }
     });
   }
+  
 
   Future<void> _saveCategories() async {
     final prefs = await SharedPreferences.getInstance();
@@ -279,20 +291,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _performCleanup() {
-    final oldXp = xp;
     final earnedXp = pendingXp;
-    
+    if (earnedXp == 0) return;
+
+    final oldXp = xp;
+
     setState(() {
       xp += earnedXp;
-      tasks.removeWhere((task) => task.isCompleted);
+      final finishedTasks = tasks.where((t) => t.isCompleted).toList();
+
+      for (var task in finishedTasks) {
+        if (task.recurrence != Recurrence.none) {
+          task.nextOccurrence = _calculateNextOccurrence(task);
+          task.dueDate = _calculateNextDueDate(task);
+          task.isCompleted = false;
+          task.completedAt = null;
+        } else {
+          completedArchive.add(task); // Добавляем в архив перед удалением
+          tasks.remove(task);
+        }
+      }
       _saveData();
     });
 
-    // Вызываем проверку после обновления состояния
     _checkLevelUp(oldXp, xp);
-
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Задачи сданы, опыт начислен!")),
+      SnackBar(content: Text("Задачи сданы! Получено опыта: $earnedXp")),
     );
   }
 
@@ -375,40 +399,26 @@ class _HomeScreenState extends State<HomeScreen> {
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'recurring') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RecurringTasksScreen(
-                          tasks: tasks,
-                          onUpdate: () {
-                            _saveData();
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                    );
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => RecurringTasksScreen(
+                      tasks: tasks,
+                      onUpdate: () { _saveData(); setState(() {}); },
+                    )));
+                  } else if (value == 'stats') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => StatisticsScreen(
+                      archive: completedArchive,
+                      totalXp: xp,
+                    )));
                   }
-                  // Сюда в будущем можно добавлять другие пункты:
-                  // else if (value == 'settings') { ... }
                 },
                 itemBuilder: (BuildContext context) => [
                   const PopupMenuItem<String>(
                     value: 'recurring',
-                    child: ListTile(
-                      leading: Icon(Icons.loop),
-                      title: Text('Повторяющиеся задачи'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    child: ListTile(leading: Icon(Icons.loop), title: Text('Повторяющиеся')),
                   ),
-                  // Сюда можно добавить новые пункты меню в будущем:
-                  // const PopupMenuItem<String>(
-                  //   value: 'settings',
-                  //   child: ListTile(
-                  //     leading: Icon(Icons.settings),
-                  //     title: Text('Настройки'),
-                  //     contentPadding: EdgeInsets.zero,
-                  //   ),
-                  // ),
+                  const PopupMenuItem<String>(
+                    value: 'stats',
+                    child: ListTile(leading: Icon(Icons.bar_chart), title: Text('Статистика')),
+                  ),
                 ],
               ),
             ],
