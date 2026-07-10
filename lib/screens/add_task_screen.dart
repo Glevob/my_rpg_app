@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../utils/task_utils.dart';
 import 'category_selection_screen.dart';
-
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class AddTaskScreen extends StatefulWidget {
   // Обновленная сигнатура: добавили DateTime? и Recurrence
@@ -31,6 +31,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   DateTime? _selectedDateTime;
   Recurrence _selectedRecurrence = Recurrence.none;
 
+  final TextEditingController _dateController = TextEditingController();
+  final maskFormatter = MaskTextInputFormatter(
+    mask: '##.##.####', // Шаблон с точками
+    filter: {"#": RegExp(r'[0-9]')},
+  );
+
   Future<void> _pickDateTime() async {
     DateTime? date = await showDatePicker(
       context: context,
@@ -46,6 +52,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       if (time != null) {
         setState(() {
           _selectedDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+          _dateController.text = DateFormat('dd.MM.yyyy').format(_selectedDateTime!);
         });
       }
     }
@@ -106,11 +113,38 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
             ),
           
-            // Выбор даты/времени
-            ListTile(
-              title: Text(_selectedDateTime == null ? "Дата и время" : DateFormat('dd.MM.yyyy HH:mm').format(_selectedDateTime!)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _pickDateTime,
+            // // Выбор даты/времени
+            // ListTile(
+            //   title: Text(_selectedDateTime == null ? "Дата и время" : DateFormat('dd.MM.yyyy HH:mm').format(_selectedDateTime!)),
+            //   trailing: const Icon(Icons.calendar_today),
+            //   onTap: _pickDateTime,
+            // ),
+            TextField(
+              controller: _dateController,
+              inputFormatters: [maskFormatter],
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Дата (ДД.ММ.ГГГГ)",
+                hintText: "01.01.2026",
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.calendar_today),
+              ),
+              onChanged: (value) {
+                if (value.length == 10) {
+                  try {
+                    setState(() {
+                      _selectedDateTime = DateFormat('dd.MM.yyyy').parse(value);
+                    });
+                  } catch (_) {}
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            
+            // Кнопка для вызова календаря (если нужно)
+            TextButton(
+              onPressed: _pickDateTime,
+              child: const Text("Выбрать дату из календаря"),
             ),
 
             // Выбор периодичности

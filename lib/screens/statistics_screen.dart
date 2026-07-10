@@ -43,8 +43,8 @@ class StatisticsScreen extends StatelessWidget {
           _buildSectionTitle("По сложности"),
           ...byDifficulty.entries.map((e) => _buildStatTile(e.key.name.toUpperCase(), "${e.value}")),
           
-          _buildSectionTitle("По типам повторов"),
-          ...byRecurrence.entries.map((e) => _buildStatTile(e.key.nameRu.isEmpty ? "Разовые" : e.key.nameRu, "${e.value}")),
+          // _buildSectionTitle("По типам повторов"),
+          // ...byRecurrence.entries.map((e) => _buildStatTile(e.key.nameRu.isEmpty ? "Разовые" : e.key.nameRu, "${e.value}")),
         ],
       ),
     );

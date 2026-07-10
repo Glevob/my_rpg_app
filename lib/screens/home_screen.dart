@@ -25,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   List<Task> completedArchive = [];
 
+  
+
   void _checkLevelUp(int oldXp, int newXp) {
     final oldLevel = LevelUtils.getLevelFromXP(oldXp);
     final newLevel = LevelUtils.getLevelFromXP(newXp);
