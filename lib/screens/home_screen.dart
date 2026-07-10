@@ -59,38 +59,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void _processRecurringTasks() {
     bool changed = false;
     DateTime now = DateTime.now();
+    int earnedXp = 0;
 
-    for (var task in tasks.where((t) => t.isCompleted && t.recurrence != Recurrence.none).toList()) {
-      if (task.completedAt == null) continue;
+    // Ищем все выполненные задачи
+    for (var task in tasks.where((t) => t.isCompleted).toList()) {
+      
+      // ЛОГИКА АВТО-СДАЧИ:
+      // Если задача выполнена, мы забираем опыт и удаляем её (или обновляем, если повторяющаяся)
+      
+      // 1. Начисляем опыт за выполненную задачу
+      earnedXp += task.experience;
 
-      bool shouldRecreate = false;
-
-      switch (task.recurrence) {
-        case Recurrence.daily:
-          // Проверяем, был ли прошлый день другим
-          if (task.completedAt!.day != now.day || task.completedAt!.month != now.month || task.completedAt!.year != now.year) {
-            shouldRecreate = true;
-          }
-          break;
-        case Recurrence.weekly:
-          // Проверяем, прошло ли 7 или более дней
-          if (now.difference(task.completedAt!).inDays >= 7) {
-            shouldRecreate = true;
-          }
-          break;
-        case Recurrence.monthly:
-          // Проверяем, изменился ли месяц
-          if (task.completedAt!.month != now.month || task.completedAt!.year != now.year) {
-            shouldRecreate = true;
-          }
-          break;
-        default:
-          break;
-      }
-
-      if (shouldRecreate) {
+      // 2. Если задача повторяющаяся, создаем её копию на следующий цикл
+      if (task.recurrence != Recurrence.none) {
+        DateTime nextDueDate = _calculateNextDueDate(task); // Нужно реализовать этот метод
         tasks.add(Task(
-          id: DateTime.now().toString(),
+          id: DateTime.now().millisecondsSinceEpoch.toString() + task.title,
           title: task.title,
           experience: task.experience,
           difficulty: task.difficulty,
@@ -98,16 +82,60 @@ class _HomeScreenState extends State<HomeScreen> {
           categoryIconCode: task.categoryIconCode,
           recurrence: task.recurrence,
           isCompleted: false,
-          dueDate: now.add(const Duration(days: 1)), // Устанавливаем новый дедлайн
+          dueDate: nextDueDate,
         ));
-        tasks.remove(task);
-        changed = true;
       }
+
+      // 3. Удаляем старую выполненную задачу
+      tasks.remove(task);
+      changed = true;
     }
 
     if (changed) {
+      setState(() {
+        xp += earnedXp;
+      });
       _saveData();
-      setState(() {});
+      if (earnedXp > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Автоматически сданы задачи! Получено опыта: $earnedXp")),
+        );
+      }
+    }
+  }
+
+  // Вспомогательный метод для расчета следующей даты
+  DateTime _calculateNextDueDate(Task task) {
+    DateTime now = DateTime.now();
+    
+    // Вспомогательная функция, чтобы всегда получать 23:59:59 текущей даты
+    DateTime endOfDay(DateTime date) {
+      return DateTime(date.year, date.month, date.day, 23, 59);
+    }
+
+    switch (task.recurrence) {
+      case Recurrence.daily:
+        // Следующий день, 23:59
+        return endOfDay(now.add(const Duration(days: 1)));
+        
+      case Recurrence.weekly:
+        // now.weekday: 1=Пн, ..., 7=Вс
+        // Чтобы всегда попадать в воскресенье следующей недели:
+        // 1. Вычисляем, сколько дней осталось до конца этой недели (воскресенья): (7 - now.weekday)
+        // 2. Добавляем +7 дней, чтобы гарантированно перейти в следующую неделю
+        int daysToAdd = (7 - now.weekday) + 7;
+        
+        return endOfDay(now.add(Duration(days: daysToAdd)));
+        
+      case Recurrence.monthly:
+        // 1. Переходим на 1-е число месяца, следующего за "месяцем исполнения"
+        // (now.month + 2) дает 1-е число месяца, идущего через один после текущего
+        DateTime firstDayTargetMonth = DateTime(now.year, now.month + 2, 1);
+        // 2. Вычитаем 1 минуту, получаем 23:59 последнего дня того месяца
+        return firstDayTargetMonth.subtract(const Duration(minutes: 1));
+        
+      default:
+        return task.dueDate ?? now;
     }
   }
 
