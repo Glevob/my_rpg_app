@@ -9,6 +9,8 @@ import 'package:intl/intl.dart';
 import 'recurring_tasks_screen.dart';
 import 'statistics_screen.dart';
 import 'xp_settings_screen.dart';
+import '../utils/achievement_manager.dart';
+import 'achievements_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -59,7 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadData();
     await _loadCategories();
     _refreshRecurringTasks();
+    await AchievementManager.loadAllAchievements();
     _processRecurringTasks();
+    setState(() {});
   }
 
   DateTime _calculateNextOccurrence(Task task) {
@@ -315,6 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
           tasks.remove(task);
         }
       }
+      _checkAchievements();
       _saveData();
     });
 
@@ -353,6 +358,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (updated) {
       _saveData(); // Сохраняем новые даты
+    }
+  }
+
+  void _checkAchievements() {
+    for (var ach in AchievementManager.achievements) {
+      bool earned = AchievementManager.checkAchievement(ach, completedArchive.length);
+      if (earned) {
+        // Сохраняем результат в память
+        AchievementManager.saveAchievementLevel(ach); 
+        
+        // Уведомляем пользователя
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Достижение получено: ${ach.title}")),
+        );
+      }
     }
   }
 
@@ -463,12 +483,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       archive: completedArchive,
                       totalXp: xp,
                     )));
-                  } else if (value == 'settings_xp'){
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const XpSettingsScreen()),
-                      );
-                    }
+                  } else if (value == 'achievements') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => AchievementsScreen(
+                      totalTasks: completedArchive.length, 
+                      currentLevel: LevelUtils.getLevelFromXP(xp),
+                    )));
+                  } else if (value == 'settings_xp') {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const XpSettingsScreen()));
+                  }
                 },
                 itemBuilder: (BuildContext context) => [
                   const PopupMenuItem<String>(
@@ -479,9 +501,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     value: 'stats',
                     child: ListTile(leading: Icon(Icons.bar_chart), title: Text('Статистика')),
                   ),
-                  const PopupMenuItem(
+                  const PopupMenuItem<String>(
+                    value: 'achievements', // Новый пункт
+                    child: ListTile(leading: Icon(Icons.emoji_events), title: Text('Достижения')),
+                  ),
+                  const PopupMenuItem<String>(
                     value: 'settings_xp',
-                    child: Text("Настройка опыта (XP)"),
+                    child: ListTile(leading: Icon(Icons.settings), title: Text('Настройка опыта (XP)')),
                   ),
                 ],
               ),
