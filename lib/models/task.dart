@@ -42,9 +42,47 @@ class Task {
   DateTime? dueDate;
   Recurrence recurrence;
   bool get isOverdue {
-    return dueDate != null && dueDate!.isBefore(DateTime.now()) && !isCompleted;
+    // Если задача выполнена, она не может быть просроченной
+    if (isCompleted) return false;
+    
+    // Если даты нет, просрочки нет
+    if (dueDate == null) return false;
+
+    // Для повторяющихся задач нам нужно убедиться, 
+    // что мы не считаем просроченной задачу, которую просто еще не "перенесли" на новый срок.
+    // Но если dueDate раньше текущего момента - значит, пользователь не отметил её выполнение вовремя.
+    final now = DateTime.now();
+    
+    // Сравниваем только год, месяц и день, чтобы игнорировать время
+    final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
+    final today = DateTime(now.year, now.month, now.day);
+    
+    return due.isBefore(today);
   }
   DateTime? nextOccurrence;
+
+  void updateRecurringTaskDate() {
+  if (recurrence == Recurrence.none || isCompleted) return;
+
+  final now = DateTime.now();
+    // Пока дата задачи меньше сегодняшней - сдвигаем её вперед
+    while (dueDate != null && dueDate!.isBefore(now)) {
+      switch (recurrence) {
+        case Recurrence.daily:
+          dueDate = dueDate!.add(const Duration(days: 1));
+          break;
+        case Recurrence.weekly:
+          dueDate = dueDate!.add(const Duration(days: 7));
+          break;
+        case Recurrence.monthly:
+          // Упрощенное добавление месяца
+          dueDate = DateTime(dueDate!.year, dueDate!.month + 1, dueDate!.day);
+          break;
+        default:
+          return;
+      }
+    }
+  }
 
   Task({
     required this.id, required this.title, required this.experience,

@@ -58,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initApp() async {
     await _loadData();
     await _loadCategories();
+    _refreshRecurringTasks();
     _processRecurringTasks();
   }
 
@@ -323,6 +324,38 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _refreshRecurringTasks() {
+    DateTime now = DateTime.now();
+    bool updated = false;
+
+    for (var task in tasks) {
+      // Обновляем только повторяющиеся и НЕвыполненные задачи
+      if (task.recurrence != Recurrence.none && !task.isCompleted && task.dueDate != null) {
+        // Пока дата дедлайна меньше сегодня
+        while (task.dueDate!.isBefore(DateTime(now.year, now.month, now.day))) {
+          switch (task.recurrence) {
+            case Recurrence.daily:
+              task.dueDate = task.dueDate!.add(const Duration(days: 1));
+              break;
+            case Recurrence.weekly:
+              task.dueDate = task.dueDate!.add(const Duration(days: 7));
+              break;
+            case Recurrence.monthly:
+              task.dueDate = DateTime(task.dueDate!.year, task.dueDate!.month + 1, task.dueDate!.day);
+              break;
+            default:
+              break;
+          }
+          updated = true;
+        }
+      }
+    }
+
+    if (updated) {
+      _saveData(); // Сохраняем новые даты
+    }
+  }
+
   // --- ВИДЖЕТЫ ---
   Widget _buildTaskTile(Task task) {
     final dateFormat = DateFormat('dd.MM HH:mm');
@@ -342,11 +375,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    if (task.dueDate != null) Text(dateFormat.format(task.dueDate!), style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                    if (task.dueDate != null && task.recurrence != Recurrence.none) const Text(" • "),
+                    // Оборачиваем элементы в Flexible, чтобы они могли "сжиматься"
+                    if (task.dueDate != null)
+                      Flexible(
+                        child: Text(
+                          dateFormat.format(task.dueDate!),
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          overflow: TextOverflow.ellipsis, // Обрезает с многоточием, если совсем тесно
+                        ),
+                      ),
+                    if (task.dueDate != null && task.recurrence != Recurrence.none) 
+                      const Text(" • "),
                     if (task.recurrence != Recurrence.none)
-                      Text(task.recurrence.nameRu, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
-                    if (overdue) const Text(" • ПРОСРОЧЕНО", style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold)),
+                      Flexible(
+                        child: Text(
+                          task.recurrence.nameRu,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (overdue && task.recurrence == Recurrence.none)
+                      const Text(
+                        " • ПРОСРОЧЕНО", 
+                        style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
                   ],
                 ),
               ),
