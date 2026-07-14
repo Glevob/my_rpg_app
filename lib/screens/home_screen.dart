@@ -279,17 +279,35 @@ class _HomeScreenState extends State<HomeScreen> {
   //   await AchievementManager.incrementTotalCompletions();
   // }
 
+  // void _toggleTask(int index) {
+  //   final task = tasks[index];
+    
+  //   setState(() {
+  //     if (!task.isCompleted) {
+  //       task.isCompleted = true;
+  //       xp += task.experience;
+  //     } else {
+  //       task.isCompleted = false;
+  //       xp -= task.experience;
+  //     }
+  //     _saveData();
+  //   });
+  // }
   void _toggleTask(int index) {
     final task = tasks[index];
     
     setState(() {
-      if (!task.isCompleted) {
-        task.isCompleted = true;
-        xp += task.experience;
+      // Просто переключаем состояние
+      task.isCompleted = !task.isCompleted;
+      
+      // Если задача стала выполненной, фиксируем время, 
+      // иначе сбрасываем (полезно для сортировки)
+      if (task.isCompleted) {
+        task.completedAt = DateTime.now();
       } else {
-        task.isCompleted = false;
-        xp -= task.experience;
+        task.completedAt = null;
       }
+      
       _saveData();
     });
   }
