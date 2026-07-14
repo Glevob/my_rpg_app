@@ -30,26 +30,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   
 
-  void _checkLevelUp(int oldXp, int newXp) {
-    final oldLevel = LevelUtils.getLevelFromXP(oldXp);
-    final newLevel = LevelUtils.getLevelFromXP(newXp);
+  // void _checkLevelUp(int oldXp, int newXp) {
+  //   final oldLevel = LevelUtils.getLevelFromXP(oldXp);
+  //   final newLevel = LevelUtils.getLevelFromXP(newXp);
 
-    if (newLevel > oldLevel) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Поздравляем!"),
-          content: Text("Вы перешли на новый уровень!\n\nУровень $oldLevel -> $newLevel"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Круто!"),
-            ),
-          ],
-        ),
-      );
-    }
-  }
+  //   if (newLevel > oldLevel) {
+  //     showDialog(
+  //       context: context,
+  //       builder: (context) => AlertDialog(
+  //         title: const Text("Поздравляем!"),
+  //         content: Text("Вы перешли на новый уровень!\n\nУровень $oldLevel -> $newLevel"),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () => Navigator.pop(context),
+  //             child: const Text("Круто!"),
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //   }
+  // }
 
   @override
   void initState() {
@@ -383,6 +383,8 @@ class _HomeScreenState extends State<HomeScreen> {
     
     for (var task in finishedTasks) {
       earnedXp += task.experience;
+
+      task.timesCompleted += 1;
       
       // Инкремент прогресса достижений для каждой задачи
       await AchievementManager.incrementTotalCompletions();
@@ -579,6 +581,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onUpdate: () { _saveData(); setState(() {}); },
                     )));
                   } else if (value == 'stats') {
+                    await _saveData();
                     // Получаем актуальный счетчик перед переходом
                     int totalCount = await AchievementManager.getTotalCompletions();
                     if (!mounted) return;
