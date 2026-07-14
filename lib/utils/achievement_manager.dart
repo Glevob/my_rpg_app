@@ -12,6 +12,20 @@ class AchievementManager {
     ),
   ];
 
+  static Future<int> incrementTotalCompletions() async {
+    final prefs = await SharedPreferences.getInstance();
+    int currentTotal = prefs.getInt('global_tasks_completed') ?? 0;
+    currentTotal++;
+    await prefs.setInt('global_tasks_completed', currentTotal);
+    return currentTotal;
+  }
+
+  // Метод для получения текущего счетчика
+  static Future<int> getTotalCompletions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('global_tasks_completed') ?? 0;
+  }
+
   // Проверка прогресса
   static Future<bool> checkAchievement(Achievement ach, int newValue) async {
     // 1. Обновляем значение

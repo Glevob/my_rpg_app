@@ -50,6 +50,7 @@ class Task {
     return dueDate!.isBefore(DateTime.now());
   }
   DateTime? nextOccurrence;
+  int timesCompleted;
 
   void updateRecurringTaskDate() {
   if (recurrence == Recurrence.none || isCompleted) return;
@@ -79,7 +80,7 @@ class Task {
     this.isCompleted = false, this.difficulty = TaskDifficulty.easy,
     this.completedAt, this.categoryName, this.categoryIconCode,
     this.dueDate, this.recurrence = Recurrence.none,
-    this.nextOccurrence,
+    this.nextOccurrence, this.timesCompleted = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -87,7 +88,7 @@ class Task {
     'difficulty': difficulty.index, 'completedAt': completedAt?.toIso8601String(),
     'categoryName': categoryName, 'categoryIconCode': categoryIconCode,
     'dueDate': dueDate?.toIso8601String(), 'recurrence': recurrence.index,
-    'nextOccurrence': nextOccurrence?.toIso8601String(),
+    'nextOccurrence': nextOccurrence?.toIso8601String(), 'timesCompleted': timesCompleted,
   };
 
   factory Task.fromJson(Map<String, dynamic> json) => Task(
@@ -100,5 +101,6 @@ class Task {
     dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
     recurrence: Recurrence.values[json['recurrence'] ?? 0],
     nextOccurrence: json['nextOccurrence'] != null ? DateTime.parse(json['nextOccurrence']) : null,
+    timesCompleted: json['timesCompleted'] ?? 0,
   );
 }
