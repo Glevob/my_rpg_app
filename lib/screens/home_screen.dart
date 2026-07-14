@@ -228,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
-  void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence) {
+  void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence, DateTime? nextOccur) {
     setState(() {
       tasks.add(Task(
         id: DateTime.now().toString(),
@@ -239,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> {
         categoryIconCode: catIcon,
         dueDate: dueDate,
         recurrence: recurrence,
+        nextOccurrence: nextOccur,
       ));
       _saveData();
     });
@@ -361,17 +362,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _checkAchievements() {
+  void _checkAchievements() async { // Добавьте async
     for (var ach in AchievementManager.achievements) {
-      bool earned = AchievementManager.checkAchievement(ach, completedArchive.length);
+      // Используем await, так как теперь мы сохраняем данные внутри метода
+      bool earned = await AchievementManager.checkAchievement(ach, completedArchive.length);
+      
       if (earned) {
-        // Сохраняем результат в память
-        AchievementManager.saveAchievementLevel(ach); 
-        
         // Уведомляем пользователя
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Достижение получено: ${ach.title}")),
-        );
+        if (mounted) { // Проверка, что виджет еще на экране
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Достижение получено: ${ach.title}")),
+          );
+        }
       }
     }
   }
@@ -381,47 +383,63 @@ class _HomeScreenState extends State<HomeScreen> {
     final dateFormat = DateFormat('dd.MM HH:mm');
     final bool overdue = task.isOverdue;
 
+    print("Задача '${task.title}': просрочена? $overdue, дата: ${task.dueDate}");
+
     return Card(
+      // Изменяем цвет карточки на светло-красный, если задача просрочена
       color: overdue ? Colors.red[50] : getDifficultyColor(task.difficulty),
       child: ListTile(
+        // Блокируем нажатие и чекбокс для просроченных задач
         onTap: overdue ? null : () => _toggleTask(tasks.indexOf(task)),
-        leading: Checkbox(value: task.isCompleted || overdue, onChanged: overdue ? null : (_) => _toggleTask(tasks.indexOf(task))),
+        leading: Checkbox(
+          value: task.isCompleted || overdue, 
+          onChanged: overdue ? null : (_) => _toggleTask(tasks.indexOf(task)),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(task.title, style: TextStyle(decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null)),
-            if (task.dueDate != null || task.recurrence != Recurrence.none)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    // Оборачиваем элементы в Flexible, чтобы они могли "сжиматься"
-                    if (task.dueDate != null)
-                      Flexible(
-                        child: Text(
-                          dateFormat.format(task.dueDate!),
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
-                          overflow: TextOverflow.ellipsis, // Обрезает с многоточием, если совсем тесно
-                        ),
-                      ),
-                    if (task.dueDate != null && task.recurrence != Recurrence.none) 
-                      const Text(" • "),
-                    if (task.recurrence != Recurrence.none)
-                      Flexible(
-                        child: Text(
-                          task.recurrence.nameRu,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    if (overdue && task.recurrence == Recurrence.none)
-                      const Text(
-                        " • ПРОСРОЧЕНО", 
-                        style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold),
-                      ),
-                  ],
-                ),
+            // Заголовок задачи с зачеркиванием и красным цветом при просрочке
+            Text(
+              task.title, 
+              style: TextStyle(
+                decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null, 
+                color: overdue ? Colors.red : Colors.black,
+                fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
               ),
+            ),
+            const SizedBox(height: 4),
+            // Строка с датой или статусом просрочки
+            Row(
+              children: [
+                if (task.dueDate != null)
+                  Flexible(
+                    child: Text(
+                      dateFormat.format(task.dueDate!),
+                      style: TextStyle(
+                        fontSize: 12, 
+                        color: overdue ? Colors.red : Colors.black54,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (task.dueDate != null && task.recurrence != Recurrence.none) 
+                  const Text(" • ", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                if (task.recurrence != Recurrence.none)
+                  Flexible(
+                    child: Text(
+                      task.recurrence.nameRu,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                // Явный вывод ПРОСРОЧЕНО для любых неповторяющихся или просроченных задач
+                if (overdue)
+                  const Text(
+                    " • ПРОСРОЧЕНО", 
+                    style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
+              ],
+            ),
           ],
         ),
         trailing: Column(

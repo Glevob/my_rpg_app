@@ -42,22 +42,12 @@ class Task {
   DateTime? dueDate;
   Recurrence recurrence;
   bool get isOverdue {
-    // Если задача выполнена, она не может быть просроченной
     if (isCompleted) return false;
-    
-    // Если даты нет, просрочки нет
     if (dueDate == null) return false;
+    if (recurrence != Recurrence.none) return false;
 
-    // Для повторяющихся задач нам нужно убедиться, 
-    // что мы не считаем просроченной задачу, которую просто еще не "перенесли" на новый срок.
-    // Но если dueDate раньше текущего момента - значит, пользователь не отметил её выполнение вовремя.
-    final now = DateTime.now();
-    
-    // Сравниваем только год, месяц и день, чтобы игнорировать время
-    final due = DateTime(dueDate!.year, dueDate!.month, dueDate!.day);
-    final today = DateTime(now.year, now.month, now.day);
-    
-    return due.isBefore(today);
+    // Сравниваем точное время до секунды
+    return dueDate!.isBefore(DateTime.now());
   }
   DateTime? nextOccurrence;
 

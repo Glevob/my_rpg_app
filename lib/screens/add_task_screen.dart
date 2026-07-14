@@ -7,7 +7,7 @@ import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class AddTaskScreen extends StatefulWidget {
   // Обновленная сигнатура: добавили DateTime? и Recurrence
-  final Function(String, int, TaskDifficulty, String?, int?, DateTime?, Recurrence) onAdd;
+  final Function(String, int, TaskDifficulty, String?, int?, DateTime?, Recurrence, DateTime?) onAdd;
   final List<Category> categories;
   final Function(List<Category>) onUpdateCategories;
 
@@ -144,7 +144,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             // Кнопка для вызова календаря (если нужно)
             TextButton(
               onPressed: _pickDateTime,
-              child: const Text("Выбрать дату из календаря"),
+              child: const Text("Выбрать дату/время из календаря"),
             ),
 
             // Выбор периодичности
@@ -196,6 +196,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               onPressed: () {
                 final xp = difficultyXpMap[_selectedDifficulty] ?? 0;
                 if (_titleController.text.isNotEmpty) {
+                  final DateTime? nextOccur = (_selectedRecurrence != Recurrence.none) 
+                    ? _selectedDateTime 
+                    : null;
                   widget.onAdd(
                     _titleController.text, 
                     xp, 
@@ -204,6 +207,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     _selectedCatIcon,
                     _selectedDateTime,
                     _selectedRecurrence,
+                    nextOccur,
                   );
                   Navigator.pop(context);
                 } else {

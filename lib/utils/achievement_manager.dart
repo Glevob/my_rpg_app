@@ -13,14 +13,18 @@ class AchievementManager {
   ];
 
   // Проверка прогресса
-  static bool checkAchievement(Achievement ach, int newValue) {
-    // Обновляем прогресс до актуального значения
+  static Future<bool> checkAchievement(Achievement ach, int newValue) async {
+    // 1. Обновляем значение
     ach.currentProgress = newValue;
     
-    // Проверяем, нужно ли повысить уровень
+    // 2. Сохраняем прогресс КАЖДЫЙ раз, когда он меняется
+    await saveAchievementLevel(ach); 
+    
+    // 3. Проверяем повышение уровня
     if (ach.currentLevel < ach.thresholds.length && 
         ach.currentProgress >= ach.thresholds[ach.currentLevel]) {
       ach.currentLevel++;
+      await saveAchievementLevel(ach); // Сохраняем и новый уровень
       return true; // Уровень повышен!
     }
     return false;
