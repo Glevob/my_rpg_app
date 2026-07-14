@@ -12,6 +12,16 @@ class AchievementsScreen extends StatelessWidget {
     required this.currentLevel,
   });
 
+  String getProgressSuffix(String id) {
+    switch (id) {
+      case 'xp_collector':
+        return "опыта";
+      case 'tasks_done':
+      default:
+        return "задач";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,7 +52,7 @@ class AchievementsScreen extends StatelessWidget {
                   const SizedBox(height: 5),
                   // Полоска прогресса
                   LinearProgressIndicator(value: progressValue, backgroundColor: Colors.grey[200]),
-                  Text("${ach.currentProgress} / $maxThreshold задач"),
+                  Text("${ach.currentProgress} / $maxThreshold ${getProgressSuffix(ach.id)}"),
                 ],
               ),
             ),

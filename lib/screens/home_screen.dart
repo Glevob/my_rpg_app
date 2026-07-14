@@ -419,6 +419,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    int currentGlobalXp = await AchievementManager.getTotalXp() + earnedXp;
+    await AchievementManager.updateTotalXp(currentGlobalXp);
+
     setState(() {
       xp += earnedXp;
     });
@@ -465,16 +468,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _checkAchievements() async {
-    // Считаем сумму всех выполнений всех задач
-      int totalPerformances = await AchievementManager.getTotalCompletions();
+  // Future<void> _checkAchievements() async {
+  //   // Считаем сумму всех выполнений всех задач
+  //     int totalPerformances = await AchievementManager.getTotalCompletions();
     
+  //   for (var ach in AchievementManager.achievements) {
+  //     bool earned = await AchievementManager.checkAchievement(ach, totalPerformances);
+  //     if (earned) {
+  //       // Показать уведомление о достижении
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text("Поздравляем! Достижение '${ach.title}' повышено!")),
+  //       );
+  //     }
+  //   }
+  // }
+  Future<void> _checkAchievements() async {
+    // 1. Получаем актуальные данные из хранилища один раз
+    final int totalTasks = await AchievementManager.getTotalCompletions();
+    final int totalXp = await AchievementManager.getTotalXp();
+
+    // 2. Итерируемся по списку и передаем нужный параметр
     for (var ach in AchievementManager.achievements) {
-      bool earned = await AchievementManager.checkAchievement(ach, totalPerformances);
+      int currentValue = 0;
+
+      // Выбираем счетчик в зависимости от типа достижения
+      if (ach.id == "tasks_done") {
+        currentValue = totalTasks;
+      } else if (ach.id == "xp_collector") {
+        currentValue = totalXp;
+      }
+
+      // 3. Проверяем повышение уровня
+      bool earned = await AchievementManager.checkAchievement(ach, currentValue);
+      
       if (earned) {
-        // Показать уведомление о достижении
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Поздравляем! Достижение '${ach.title}' повышено!")),
+          SnackBar(
+            content: Text("Поздравляем! Достижение '${ach.title}' повышено до уровня '${ach.levelTitles[ach.currentLevel - 1]}'!"),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     }

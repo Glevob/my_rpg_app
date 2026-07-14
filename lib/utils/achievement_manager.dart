@@ -8,9 +8,25 @@ class AchievementManager {
       id: "tasks_done",
       title: "Задачник",
       levelTitles: ["Ученик", "Мастер", "Гуру"],
-      thresholds: [10, 50, 100],
+      thresholds: [10, 50, 100], // Необходимое количество выполненных задач
+    ),
+    Achievement(
+      id: "xp_collector",
+      title: "Коллекционер опыта",
+      levelTitles: ["Новичок", "Опытный", "Легенда"],
+      thresholds: [1000, 5000, 10000], // Пороги по сумме XP
     ),
   ];
+
+  static Future<void> updateTotalXp(int xp) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('global_xp_earned', xp);
+  }
+
+  static Future<int> getTotalXp() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('global_xp_earned') ?? 0;
+  }
 
   static Future<int> incrementTotalCompletions() async {
     final prefs = await SharedPreferences.getInstance();
