@@ -572,16 +572,21 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // Новое меню в углу
               PopupMenuButton<String>(
-                onSelected: (value) {
+                onSelected: (value) async {
                   if (value == 'recurring') {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => RecurringTasksScreen(
                       tasks: tasks,
                       onUpdate: () { _saveData(); setState(() {}); },
                     )));
                   } else if (value == 'stats') {
+                    // Получаем актуальный счетчик перед переходом
+                    int totalCount = await AchievementManager.getTotalCompletions();
+                    if (!mounted) return;
                     Navigator.push(context, MaterialPageRoute(builder: (_) => StatisticsScreen(
+                      tasks: tasks, // Передаем список активных задач
                       archive: completedArchive,
                       totalXp: xp,
+                      totalCompletedCount: totalCount,
                     )));
                   } else if (value == 'achievements') {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => AchievementsScreen(
