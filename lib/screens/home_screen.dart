@@ -447,6 +447,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _decrementTaskProgress(Task task) {
+    setState(() {
+      if (task.timesCompleted > 0) {
+        task.timesCompleted -= 1;
+        
+        // Если задача была выполнена, но мы убавили прогресс — снимаем статус выполнения
+        if (task.isCompleted) {
+          task.isCompleted = false;
+          task.completedAt = null;
+        }
+        
+        _saveData();
+      }
+    });
+  }
+
   // Полностью завершает или сбрасывает задачу (для чекбокса и клика по карточке)
   void _toggleTaskCompletion(Task task) {
     setState(() {
@@ -564,37 +580,52 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
 
-          // Правый блок (XP и кнопки управления: "+" и мусорка)
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text("$totalTaskXp XP", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!task.isCompleted && task.targetCompletions > 1)
+          // Правый блок (XP и кнопки управления: "-", "+" и мусорка)
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text("$totalTaskXp XP", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Кнопка уменьшения прогресса "-" (появляется, если сделано хотя бы 1 повторение)
+                    if (task.targetCompletions > 1 && task.timesCompleted > 0)
+                      InkWell(
+                        onTap: () => _decrementTaskProgress(task),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(Icons.remove_circle_outline, size: 20, color: Colors.orange),
+                        ),
+                      ),
+                    if (task.targetCompletions > 1 && task.timesCompleted > 0)
+                      const SizedBox(width: 4),
+
+                    // Кнопка увеличения прогресса "+"
+                    if (!task.isCompleted && task.targetCompletions > 1)
+                      InkWell(
+                        onTap: () => _incrementTaskProgress(task),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
+                        ),
+                      ),
+                    if (!task.isCompleted && task.targetCompletions > 1)
+                      const SizedBox(width: 4),
+
+                    // Кнопка удаления
                     InkWell(
-                      onTap: () => _incrementTaskProgress(task),
+                      onTap: () => _deleteTask(task),
                       child: const Padding(
                         padding: EdgeInsets.all(4.0),
-                        child: Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
+                        child: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                       ),
                     ),
-                  if (!task.isCompleted && task.targetCompletions > 1)
-                    const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => _deleteTask(task),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     ),
