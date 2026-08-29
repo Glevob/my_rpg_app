@@ -303,9 +303,10 @@ class _HomeScreenState extends State<HomeScreen> {
     int earnedXp = 0;
     
     for (var task in finishedTasks) {
-      earnedXp += task.experience;
+      // Полный опыт: опыт за 1 повторение * целевое количество
+      earnedXp += task.experience * task.targetCompletions;
 
-      task.timesCompleted += 1;
+      // task.timesCompleted += 1;
       
       // Инкремент прогресса достижений для каждой задачи
       await AchievementManager.incrementTotalCompletions();
@@ -313,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (task.recurrence != Recurrence.none) {
         // Для повторяющихся просто сбрасываем состояние
         task.isCompleted = false;
+        task.timesCompleted = 0;
         task.nextOccurrence = _calculateNextOccurrence(task);
         task.dueDate = _calculateNextDueDate(task);
       } else {
@@ -339,16 +341,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _refreshRecurringTasks() {
+  void _refreshRecurringTasks() async {
     final logical = _logicalNow;
     final currentLogicalDay = DateTime(logical.year, logical.month, logical.day);
     bool updated = false;
+    int partialEarnedXp = 0;
 
     for (var task in recurringTasks) {
       // Обновляем только повторяющиеся и НЕвыполненные задачи
       if (task.recurrence != Recurrence.none && !task.isCompleted && task.dueDate != null) {
         // Пока дата дедлайна меньше сегодня
         while (task.dueDate!.isBefore(currentLogicalDay)) {
+          // Если задача была частично выполнена (например, 2 из 3 раз)
+          if (task.timesCompleted > 0) {
+            // Формула: фактически выполненные * опыт за 1 раз * 0.5
+            int taskXp = (task.timesCompleted * task.experience * 0.5).round();
+            partialEarnedXp += taskXp;
+          }
+
+          // Сбрасываем прогресс для нового периода
+          task.timesCompleted = 0;
+          
           switch (task.recurrence) {
             case Recurrence.daily:
               task.dueDate = task.dueDate!.add(const Duration(days: 1));
@@ -367,7 +380,22 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    if (updated) {
+    if (partialEarnedXp > 0) {
+      xp += partialEarnedXp;
+      int currentGlobalXp = await AchievementManager.getTotalXp() + partialEarnedXp;
+      await AchievementManager.updateTotalXp(currentGlobalXp);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Срок задач истек. За частичное выполнение получено опыта: $partialEarnedXp"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+
+    if (updated || partialEarnedXp > 0) {
       _saveData(); // Сохраняем новые даты
     }
   }
@@ -405,15 +433,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _incrementTaskProgress(Task task) {
     setState(() {
-      if (task.isCompleted) return;
+      if (task.isCompleted) {
+        // Если задача уже выполнена, снимаем галочку и уменьшаем прогресс
+        task.isCompleted = false;
+        task.completedAt = null;
+        if (task.timesCompleted >= task.targetCompletions) {
+          task.timesCompleted = task.targetCompletions - 1;
+        }
+      } else {
 
-      task.timesCompleted += 1;
+        task.timesCompleted += 1;
 
-      if (task.timesCompleted >= task.targetCompletions) {
-        task.isCompleted = true;
-        task.completedAt = DateTime.now();
+        if (task.timesCompleted >= task.targetCompletions) {
+          task.isCompleted = true;
+          task.completedAt = DateTime.now();
+        }       
       }
-      
       _saveData();
     });
   }
@@ -422,107 +457,133 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTaskTile(Task task) {
     final dateFormat = DateFormat('dd.MM HH:mm');
     final bool overdue = task.isOverdue;
+    final int totalTaskXp = task.experience * task.targetCompletions;
 
     return Card(
       color: overdue ? Colors.red[50] : getDifficultyColor(task.difficulty),
-      child: ListTile(
+      child: InkWell(
         onTap: overdue ? null : () => _incrementTaskProgress(task),
-        leading: Checkbox(
-          value: task.isCompleted || overdue, 
-          onChanged: overdue ? null : (_) => _incrementTaskProgress(task),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    task.title, 
-                    style: TextStyle(
-                      decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null, 
-                      color: overdue ? Colors.red : Colors.black,
-                      fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Чекбокс слева
+              Checkbox(
+                value: task.isCompleted || overdue, 
+                onChanged: overdue ? null : (_) => _incrementTaskProgress(task),
+              ),
+              const SizedBox(width: 4),
+              
+              // Основной блок (Название + Детали)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            task.title, 
+                            style: TextStyle(
+                              fontSize: 16,
+                              decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null, 
+                              color: overdue ? Colors.red : Colors.black,
+                              fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (task.targetCompletions > 1)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black12,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              "${task.timesCompleted}/${task.targetCompletions}",
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (task.dueDate != null)
+                          Flexible(
+                            child: Text(
+                              dateFormat.format(task.dueDate!),
+                              style: TextStyle(
+                                fontSize: 12, 
+                                color: overdue ? Colors.red : Colors.black54,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        if (task.dueDate != null && task.recurrence != Recurrence.none) 
+                          const Text(" • ", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                        if (task.recurrence != Recurrence.none)
+                          Flexible(
+                            child: Text(
+                              task.recurrence.nameRu,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        if (overdue)
+                          const Text(
+                            " • ПРОСРОЧЕНО", 
+                            style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                // Бейдж прогресса (например, 1/3)
-                if (task.targetCompletions > 1)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black12,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      "${task.timesCompleted}/${task.targetCompletions}",
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                if (task.dueDate != null)
-                  Flexible(
-                    child: Text(
-                      dateFormat.format(task.dueDate!),
-                      style: TextStyle(
-                        fontSize: 12, 
-                        color: overdue ? Colors.red : Colors.black54,
+              ),
+              const SizedBox(width: 8),
+
+              // Правый блок (XP и кнопки управления)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("$totalTaskXp XP", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!task.isCompleted && task.targetCompletions > 1)
+                        InkWell(
+                          onTap: () => _incrementTaskProgress(task),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
+                          ),
+                        ),
+                      if (!task.isCompleted && task.targetCompletions > 1)
+                        const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => _deleteTask(task),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ),
-                if (task.dueDate != null && task.recurrence != Recurrence.none) 
-                  const Text(" • ", style: TextStyle(fontSize: 12, color: Colors.black54)),
-                if (task.recurrence != Recurrence.none)
-                  Flexible(
-                    child: Text(
-                      task.recurrence.nameRu,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                if (overdue)
-                  const Text(
-                    " • ПРОСРОЧЕНО", 
-                    style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-              ],
-            ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("${task.experience} XP"),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Кнопка быстрого добавления прогресса "+"
-                if (!task.isCompleted && task.targetCompletions > 1)
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
-                    onPressed: () => _incrementTaskProgress(task),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _deleteTask(task),
-                  child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  int get pendingXp => [...regularTasks, ...recurringTasks].where((t) => t.isCompleted).fold(0, (sum, t) => sum + t.experience);
+  int get pendingXp => [...regularTasks, ...recurringTasks].where((t) => t.isCompleted).fold(0, (sum, t) => sum + (t.experience * t.targetCompletions));
 
   @override
   Widget build(BuildContext context) {
