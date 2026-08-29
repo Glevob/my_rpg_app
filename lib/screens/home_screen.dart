@@ -52,20 +52,24 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {});
   }
 
+  // Получение текущего времени с учетом смещения дня в 4:00 утра
+  DateTime get _logicalNow => DateTime.now().subtract(const Duration(hours: 4));
+
   DateTime _calculateNextOccurrence(Task task) {
-    DateTime now = DateTime.now();
+    final logical = _logicalNow;
+    // DateTime now = DateTime.now();
     switch (task.recurrence) {
       case Recurrence.daily:
-        return DateTime(now.year, now.month, now.day + 1, 0, 0);
+        return DateTime(logical.year, logical.month, logical.day + 1, 4, 0);
       case Recurrence.weekly:
         // Следующий понедельник 00:00
-        int daysUntilMonday = 8 - now.weekday;
-        return DateTime(now.year, now.month, now.day + daysUntilMonday, 0, 0);
+        int daysUntilMonday = 8 - logical.weekday;
+        return DateTime(logical.year, logical.month, logical.day + daysUntilMonday, 4, 0);
       case Recurrence.monthly:
         // 1-е число следующего месяца 00:00
-        return DateTime(now.year, now.month + 1, 1, 0, 0);
+        return DateTime(logical.year, logical.month + 1, 1, 4, 0);
       default:
-        return now;
+        return DateTime.now();
     }
   } 
 
@@ -94,36 +98,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Вспомогательный метод для расчета следующей даты
   DateTime _calculateNextDueDate(Task task) {
-    DateTime now = DateTime.now();
+    final logical = _logicalNow;
     
     // Вспомогательная функция, чтобы всегда получать 23:59:59 текущей даты
-    DateTime endOfDay(DateTime date) {
-      return DateTime(date.year, date.month, date.day, 23, 59);
+    DateTime endOfLogicalDay(DateTime date) {
+      return DateTime(date.year, date.month, date.day, 3, 59).add(const Duration(days: 1));
     }
 
     switch (task.recurrence) {
       case Recurrence.daily:
         // Следующий день, 23:59
-        return endOfDay(now.add(const Duration(days: 1)));
+        return endOfLogicalDay(logical.add(const Duration(days: 1)));
         
       case Recurrence.weekly:
         // now.weekday: 1=Пн, ..., 7=Вс
         // Чтобы всегда попадать в воскресенье следующей недели:
         // 1. Вычисляем, сколько дней осталось до конца этой недели (воскресенья): (7 - now.weekday)
         // 2. Добавляем +7 дней, чтобы гарантированно перейти в следующую неделю
-        int daysToAdd = (7 - now.weekday) + 7;
+        int daysToAdd = (7 - logical.weekday) + 7;
         
-        return endOfDay(now.add(Duration(days: daysToAdd)));
+        return endOfLogicalDay(logical.add(Duration(days: daysToAdd)));
         
       case Recurrence.monthly:
         // 1. Переходим на 1-е число месяца, следующего за "месяцем исполнения"
         // (now.month + 2) дает 1-е число месяца, идущего через один после текущего
-        DateTime firstDayTargetMonth = DateTime(now.year, now.month + 2, 1);
+        DateTime firstDayTargetMonth = DateTime(logical.year, logical.month + 2, 1);
         // 2. Вычитаем 1 минуту, получаем 23:59 последнего дня того месяца
         return firstDayTargetMonth.subtract(const Duration(minutes: 1));
         
       default:
-        return task.dueDate ?? now;
+        return task.dueDate ?? DateTime.now();
     }
   }
 
@@ -334,14 +338,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _refreshRecurringTasks() {
-    DateTime now = DateTime.now();
+    final logical = _logicalNow;
+    final currentLogicalDay = DateTime(logical.year, logical.month, logical.day);
     bool updated = false;
 
     for (var task in recurringTasks) {
       // Обновляем только повторяющиеся и НЕвыполненные задачи
       if (task.recurrence != Recurrence.none && !task.isCompleted && task.dueDate != null) {
         // Пока дата дедлайна меньше сегодня
-        while (task.dueDate!.isBefore(DateTime(now.year, now.month, now.day))) {
+        while (task.dueDate!.isBefore(currentLogicalDay)) {
           switch (task.recurrence) {
             case Recurrence.daily:
               task.dueDate = task.dueDate!.add(const Duration(days: 1));
