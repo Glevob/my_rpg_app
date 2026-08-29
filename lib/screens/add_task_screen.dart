@@ -38,6 +38,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final TextEditingController _titleController = TextEditingController();
   // Выбранная сложность задачи по умолчанию (легкая).
   TaskDifficulty _selectedDifficulty = TaskDifficulty.easy;
+
+  final TextEditingController _xpController = TextEditingController();
+  int _getDefaultXp(TaskDifficulty difficulty) {
+    return difficultyXpMap[difficulty] ?? 20;
+  }
+
   // Имя выбранной категории (по умолчанию не выбрана, поэтому null).
   String? _selectedCatName;
   // Код иконки выбранной категории.
@@ -55,6 +61,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     mask: '##.##.####', 
     filter: {"#": RegExp(r'[0-9]')},
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _xpController.text = _getDefaultXp(_selectedDifficulty).toString();
+  }
+
+  @override
+  void dispose() {
+    _xpController.dispose();
+    _titleController.dispose();
+    super.dispose();
+  }
 
   // Функция, которая открывает всплывающее окошко календаря и часов для выбора дедлайна.
   Future<void> _pickDateTime() async {
@@ -121,25 +140,44 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Выпадающий список для выбора сложности задачи.
-            DropdownButtonFormField<TaskDifficulty>(
-              value: _selectedDifficulty,
-              decoration: const InputDecoration(labelText: "Сложность", border: OutlineInputBorder()),
-              items: TaskDifficulty.values.map((d) => DropdownMenuItem(
-                value: d, 
-                child: Text(difficultyNames[d] ?? d.name) // Берем красивое русское имя сложности
-              )).toList(),
-              // При изменении сложности обновляем состояние экрана.
-              onChanged: (val) => setState(() => _selectedDifficulty = val!),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<TaskDifficulty>(
+                    value: _selectedDifficulty,
+                    decoration: const InputDecoration(labelText: "Сложность", border: OutlineInputBorder()),
+                    items: TaskDifficulty.values.map((d) => DropdownMenuItem(
+                      value: d, 
+                      child: Text(difficultyNames[d] ?? d.name) // Берем красивое русское имя сложности
+                    )).toList(),
+                    // При изменении сложности обновляем состояние экрана и автоматически подставляем дефолтный опыт в поле
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedDifficulty = val;
+                          _xpController.text = _getDefaultXp(val).toString();
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Поле для ввода кастомного количества опыта
+                Expanded(
+                  flex: 1,
+                  child: TextField(
+                    controller: _xpController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "Опыт (XP)",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            // Информационный текст, показывающий, сколько опыта получит игрок за выбранную сложность.
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                "Награда: ${difficultyXpMap[_selectedDifficulty]} XP",
-                style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
-              ),
-            ),
+            const SizedBox(height: 15),
           
             // Текстовое поле для ввода даты с маской (пользователь вводит цифры, точки ставятся сами).
             TextField(
@@ -235,7 +273,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
               onPressed: () {
                 // Считаем опыт на основе выбранной сложности.
-                final xp = difficultyXpMap[_selectedDifficulty] ?? 0;
+                final int xp = int.tryParse(_xpController.text) ?? _getDefaultXp(_selectedDifficulty);
                 // Проверяем: если название задачи не пустое...
                 if (_titleController.text.isNotEmpty) {
                   // Если задача повторяющаяся, сохраняем дату как стартовую точку повторения, иначе null.
