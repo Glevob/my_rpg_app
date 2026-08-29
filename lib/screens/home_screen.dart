@@ -297,22 +297,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _performCleanup() async {
     final allActive = [...regularTasks, ...recurringTasks];
-    final finishedTasks = allActive.where((t) => t.isCompleted).toList();
-    if (finishedTasks.isEmpty) return;
+    
+    // Ищем задачи либо полностью выполненные, либо имеющие частичный прогресс
+    final targetTasks = allActive.where((t) => t.isCompleted || t.timesCompleted > 0).toList();
+    if (targetTasks.isEmpty) return;
 
     int earnedXp = 0;
     
-    for (var task in finishedTasks) {
-      // Полный опыт: опыт за 1 повторение * целевое количество
-      earnedXp += task.experience * task.targetCompletions;
-
-      // task.timesCompleted += 1;
+    for (var task in targetTasks) {
+      if (task.isCompleted) {
+        // Полный опыт: опыт за 1 повторение * целевое количество
+        earnedXp += ((task.experience * task.targetCompletions) * 1.1).round();
+      } else {
+        // Формула для частично выполненной многозначной задачи:
+        // Например, опыт пропорционально выполненным шагам (или с учетом вашего коэффициента/формулы)
+        // Пример формулы: task.experience * task.timesCompleted
+        earnedXp += (task.experience * task.timesCompleted / 2).round();
+      }
       
-      // Инкремент прогресса достижений для каждой задачи
+      // Инкремент прогресса достижений для каждой сданной/очищаемой задачи
       await AchievementManager.incrementTotalCompletions();
       
       if (task.recurrence != Recurrence.none) {
-        // Для повторяющихся просто сбрасываем состояние
+        // Для повторяющихся сбрасываем состояние и двигаем даты
         task.isCompleted = false;
         task.timesCompleted = 0;
         task.nextOccurrence = _calculateNextOccurrence(task);
@@ -348,20 +355,29 @@ class _HomeScreenState extends State<HomeScreen> {
     int partialEarnedXp = 0;
 
     for (var task in recurringTasks) {
-      // Обновляем только повторяющиеся и НЕвыполненные задачи
-      if (task.recurrence != Recurrence.none && !task.isCompleted && task.dueDate != null) {
-        // Пока дата дедлайна меньше сегодня
+      // Проверяем повторяющиеся задачи, у которых наступил дедлайн
+      if (task.recurrence != Recurrence.none && task.dueDate != null) {
+        // Пока дата дедлайна меньше текущего логического дня
         while (task.dueDate!.isBefore(currentLogicalDay)) {
-          // Если задача была частично выполнена (например, 2 из 3 раз)
-          if (task.timesCompleted > 0) {
-            // Формула: фактически выполненные * опыт за 1 раз * 0.5
+          
+          // 1. Если задача просрочена, но имеет частичный прогресс (и не была полностью закрыта)
+          if (!task.isCompleted && task.timesCompleted > 0) {
+            // Считаем опыт: (фактические шаги * опыт за 1 шаг * 0.5)
             int taskXp = (task.timesCompleted * task.experience * 0.5).round();
+            partialEarnedXp += taskXp;
+          } 
+          // 2. Если задача была выполнена полностью к моменту просрочки/смены дня
+          else if (task.isCompleted) {
+            int taskXp = task.experience * task.targetCompletions;
             partialEarnedXp += taskXp;
           }
 
-          // Сбрасываем прогресс для нового периода
+          // Сбрасываем прогресс и состояние выполнения для нового периода
+          task.isCompleted = false;
           task.timesCompleted = 0;
+          task.completedAt = null;
           
+          // Сдвигаем дедлайн на следующий период
           switch (task.recurrence) {
             case Recurrence.daily:
               task.dueDate = task.dueDate!.add(const Duration(days: 1));
@@ -388,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Срок задач истек. За частичное выполнение получено опыта: $partialEarnedXp"),
+            content: Text("Срок задач истек. Начислено опыта (с учетом частичного выполнения): $partialEarnedXp"),
             backgroundColor: Colors.orange,
           ),
         );
@@ -396,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (updated || partialEarnedXp > 0) {
-      _saveData(); // Сохраняем новые даты
+      _saveData(); // Сохраняем обновленные данные и опыт
     }
   }
 

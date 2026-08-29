@@ -145,4 +145,29 @@ class Task {
     timesCompleted: json['timesCompleted'] ?? 0,
     targetCompletions: json['targetCompletions'] ?? 1,
   );
+
+
+  int calculateEarnedXp() {
+    // Полный опыт за все повторения (например, 10 * 4 = 40)
+    final int maxPossibleXp = experience * targetCompletions;
+
+    // 1) Если задача выполнена полностью — даем весь опыт
+    if (isCompleted && timesCompleted >= targetCompletions) {
+      return maxPossibleXp;
+    }
+
+    // Опыт за фактически выполненные повторения до просрочки/текущего момента
+    final int partialXp = experience * timesCompleted;
+
+    // 2) Если задача просрочена (или имеет частичный прогресс при просрочке)
+    if (isOverdue && timesCompleted > 0) {
+      // Возвращаем половину от фактически выполненного (округляем до целого через ~/2)
+      return (partialXp * 0.5).round();
+    }
+
+    // Если не просрочена и еще не завершена — может давать частичный опыт по мере выполнения 
+    // (или 0, если вы хотите давать опыт строго по факту завершения/сдачи)
+    return partialXp; 
+  }
+
 }
