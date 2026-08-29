@@ -17,7 +17,6 @@ extension RecurrenceExtension on Recurrence {
       case Recurrence.daily: return "Ежедневно";
       case Recurrence.weekly: return "Еженедельно";
       case Recurrence.monthly: return "Ежемесячно";
-      default: return "";
     }
   }
 }
@@ -67,15 +66,18 @@ class Task {
   
   DateTime? nextOccurrence;  // Дата следующего появления задачи (для повторяющихся)
   int timesCompleted;        // Сколько раз за всё время играющий успешно завершал эту задачу
+  int targetCompletions;     // Целевое количество выполнений для завершения задачи (например, 3 раза)
 
   // Метод, который сдвигает дедлайн повторяющейся задачи на следующий день/неделю/месяц, если время вышло.
   void updateRecurringTaskDate() {
-  if (recurrence == Recurrence.none || isCompleted) return; // Если задача не повторяющаяся или уже выполнена, ничего не делаем
+    if (recurrence == Recurrence.none || isCompleted) return; // Если задача не повторяющаяся или уже выполнена, ничего не делаем
 
-  final now = DateTime.now();
+    final now = DateTime.now();
     // Пока дедлайн задачи меньше сегодняшнего дня — сдвигаем его вперед на следующий цикл
     while (dueDate != null && dueDate!.isBefore(now)) {
       switch (recurrence) {
+        case Recurrence.none:
+          return;
         case Recurrence.daily:
           dueDate = dueDate!.add(const Duration(days: 1)); // Добавляем 1 день
           break;
@@ -86,8 +88,6 @@ class Task {
           // Упрощенное добавление ровно одного месяца к дате
           dueDate = DateTime(dueDate!.year, dueDate!.month + 1, dueDate!.day);
           break;
-        default:
-          return;
       }
     }
   }
@@ -95,33 +95,52 @@ class Task {
   // Конструктор: инструкция по созданию задачи. 
   // ID, текст и опыт — обязательны. Остальное имеет стандартные значения (по умолчанию).
   Task({
-    required this.id, required this.title, required this.experience,
-    this.isCompleted = false, this.difficulty = TaskDifficulty.easy,
-    this.completedAt, this.categoryName, this.categoryIconCode,
-    this.dueDate, this.recurrence = Recurrence.none,
-    this.nextOccurrence, this.timesCompleted = 0,
+    required this.id, 
+    required this.title, 
+    required this.experience,
+    this.isCompleted = false, 
+    this.difficulty = TaskDifficulty.easy,
+    this.completedAt, 
+    this.categoryName, 
+    this.categoryIconCode,
+    this.dueDate, 
+    this.recurrence = Recurrence.none,
+    this.nextOccurrence, 
+    this.timesCompleted = 0,
+    this.targetCompletions = 1,
   });
 
   // Превращает объект задачи в формат JSON (текст), чтобы записать её в память телефона.
   Map<String, dynamic> toJson() => {
-    'id': id, 'title': title, 'experience': experience, 'isCompleted': isCompleted,
-    'difficulty': difficulty.index, 'completedAt': completedAt?.toIso8601String(),
-    'categoryName': categoryName, 'categoryIconCode': categoryIconCode,
-    'dueDate': dueDate?.toIso8601String(), 'recurrence': recurrence.index,
-    'nextOccurrence': nextOccurrence?.toIso8601String(), 'timesCompleted': timesCompleted,
+    'id': id, 
+    'title': title, 
+    'experience': experience, 
+    'isCompleted': isCompleted,
+    'difficulty': difficulty.index, 
+    'completedAt': completedAt?.toIso8601String(),
+    'categoryName': categoryName, 
+    'categoryIconCode': categoryIconCode,
+    'dueDate': dueDate?.toIso8601String(), 
+    'recurrence': recurrence.index,
+    'nextOccurrence': nextOccurrence?.toIso8601String(), 
+    'timesCompleted': timesCompleted,
+    'targetCompletions': targetCompletions,
   };
 
   // Восстанавливает задачу из сохраненного на телефоне текста (JSON).
   factory Task.fromJson(Map<String, dynamic> json) => Task(
     id: json['id'] ?? DateTime.now().toString(), // Если ID нет, создаем текущее время как уникальный текст
-    title: json['title'], experience: json['experience'],
+    title: json['title'], 
+    experience: json['experience'],
     isCompleted: json['isCompleted'] ?? false,
     difficulty: TaskDifficulty.values[json['difficulty'] ?? 0],
     completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
-    categoryName: json['categoryName'], categoryIconCode: json['categoryIconCode'],
+    categoryName: json['categoryName'], 
+    categoryIconCode: json['categoryIconCode'],
     dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
     recurrence: Recurrence.values[json['recurrence'] ?? 0],
     nextOccurrence: json['nextOccurrence'] != null ? DateTime.parse(json['nextOccurrence']) : null,
     timesCompleted: json['timesCompleted'] ?? 0,
+    targetCompletions: json['targetCompletions'] ?? 1,
   );
 }

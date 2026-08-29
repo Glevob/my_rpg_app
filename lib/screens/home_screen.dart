@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
-  void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence, DateTime? nextOccur) {
+  void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence, DateTime? nextOccur, int targetCompletions) {
     setState(() {
       final newTask = Task(
         id: DateTime.now().toString(),
@@ -222,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
         dueDate: dueDate,
         recurrence: recurrence,
         nextOccurrence: nextOccur,
+        targetCompletions: targetCompletions, // Сохраняем цель
       );
 
       if (recurrence == Recurrence.none) {
@@ -402,37 +403,65 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _incrementTaskProgress(Task task) {
+    setState(() {
+      if (task.isCompleted) return;
+
+      task.timesCompleted += 1;
+
+      if (task.timesCompleted >= task.targetCompletions) {
+        task.isCompleted = true;
+        task.completedAt = DateTime.now();
+      }
+      
+      _saveData();
+    });
+  }
+
   // --- ВИДЖЕТЫ ---
   Widget _buildTaskTile(Task task) {
     final dateFormat = DateFormat('dd.MM HH:mm');
     final bool overdue = task.isOverdue;
 
-    print("Задача '${task.title}': просрочена? $overdue, дата: ${task.dueDate}");
-
     return Card(
-      // Изменяем цвет карточки на светло-красный, если задача просрочена
       color: overdue ? Colors.red[50] : getDifficultyColor(task.difficulty),
       child: ListTile(
-        // Блокируем нажатие и чекбокс для просроченных задач
-        onTap: overdue ? null : () => _toggleTask(task),
+        onTap: overdue ? null : () => _incrementTaskProgress(task),
         leading: Checkbox(
           value: task.isCompleted || overdue, 
-          onChanged: overdue ? null : (_) => _toggleTask(task),
+          onChanged: overdue ? null : (_) => _incrementTaskProgress(task),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок задачи с зачеркиванием и красным цветом при просрочке
-            Text(
-              task.title, 
-              style: TextStyle(
-                decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null, 
-                color: overdue ? Colors.red : Colors.black,
-                fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title, 
+                    style: TextStyle(
+                      decoration: (task.isCompleted || overdue) ? TextDecoration.lineThrough : null, 
+                      color: overdue ? Colors.red : Colors.black,
+                      fontWeight: overdue ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                // Бейдж прогресса (например, 1/3)
+                if (task.targetCompletions > 1)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      "${task.timesCompleted}/${task.targetCompletions}",
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
-            // Строка с датой или статусом просрочки
             Row(
               children: [
                 if (task.dueDate != null)
@@ -456,7 +485,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                // Явный вывод ПРОСРОЧЕНО для любых неповторяющихся или просроченных задач
                 if (overdue)
                   const Text(
                     " • ПРОСРОЧЕНО", 
@@ -470,9 +498,23 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text("${task.experience} XP"),
-            GestureDetector(
-              onTap: () => _deleteTask(task),
-              child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Кнопка быстрого добавления прогресса "+"
+                if (!task.isCompleted && task.targetCompletions > 1)
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, size: 20, color: Colors.green),
+                    onPressed: () => _incrementTaskProgress(task),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => _deleteTask(task),
+                  child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                ),
+              ],
             ),
           ],
         ),
