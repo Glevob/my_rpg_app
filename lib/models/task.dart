@@ -53,6 +53,7 @@ class Task {
   int? categoryIconCode;     // Иконка категории (если она есть)
   DateTime? dueDate;         // Крайний срок (дедлайн), до которого нужно выполнить задачу
   Recurrence recurrence;     // Правило повторения (например, повторять ежедневно или нет)
+  bool isExpanded; // Новое поле для отслеживания состояния раскрытия
   
   // Проверка: просрочена ли задача. Возвращает "да" (true) или "нет" (false).
   bool get isOverdue {
@@ -108,6 +109,7 @@ class Task {
     this.nextOccurrence, 
     this.timesCompleted = 0,
     this.targetCompletions = 1,
+    this.isExpanded = false,
   });
 
   // Превращает объект задачи в формат JSON (текст), чтобы записать её в память телефона.
