@@ -11,6 +11,7 @@ import 'statistics_screen.dart';
 import 'xp_settings_screen.dart';
 import '../utils/achievement_manager.dart';
 import 'achievements_screen.dart';
+import 'future_tasks_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -489,13 +490,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final pending = pendingXp; // XP за выполненные, но не сданные задачи
     final targetLevel = LevelUtils.getLevelFromXP(xp + pending);
 
+    final logicalNow = _logicalNow;
+    final oneWeekLater = logicalNow.add(const Duration(days: 7));
+
+    bool isWithinOneWeek(Task task) {
+      if (task.dueDate == null) return true;
+      return task.dueDate!.isBefore(oneWeekLater) || task.dueDate!.isAtSameMomentAs(oneWeekLater);
+    }
+
     // Разделение и сортировка
     // Сначала фильтруем только те, которые должны быть видны сейчас
     final visibleRecurring = recurringTasks.where((t) => 
-      t.nextOccurrence == null || DateTime.now().isAfter(t.nextOccurrence!)
+      (t.nextOccurrence == null || DateTime.now().isAfter(t.nextOccurrence!)) &&
+      isWithinOneWeek(t)
     ).toList();
 
-    final allVisible = [...regularTasks, ...visibleRecurring];
+    final visibleRegular = regularTasks.where(isWithinOneWeek).toList();
+
+    final allVisible = [...visibleRegular, ...visibleRecurring];
 
     // Теперь разделяем отфильтрованные задачи
     final incomplete = allVisible.where((t) => !t.isCompleted).toList()
@@ -519,6 +531,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (value == 'recurring') {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => RecurringTasksScreen(
                       tasks: recurringTasks,
+                      onUpdate: () { _saveData(); setState(() {}); },
+                    )));
+                  } else if (value == 'future') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => FutureTasksScreen(
+                      regularTasks: regularTasks,
+                      recurringTasks: recurringTasks,
                       onUpdate: () { _saveData(); setState(() {}); },
                     )));
                   } else if (value == 'stats') {
@@ -545,6 +563,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const PopupMenuItem<String>(
                     value: 'recurring',
                     child: ListTile(leading: Icon(Icons.loop), title: Text('Повторяющиеся')),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'future',
+                    child: ListTile(leading: Icon(Icons.update), title: Text('Будущие задачи (> 1 недели)')),
                   ),
                   const PopupMenuItem<String>(
                     value: 'stats',
