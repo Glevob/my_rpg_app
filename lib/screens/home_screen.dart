@@ -28,29 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   List<Task> completedArchive = [];
 
-  
-
-  // void _checkLevelUp(int oldXp, int newXp) {
-  //   final oldLevel = LevelUtils.getLevelFromXP(oldXp);
-  //   final newLevel = LevelUtils.getLevelFromXP(newXp);
-
-  //   if (newLevel > oldLevel) {
-  //     showDialog(
-  //       context: context,
-  //       builder: (context) => AlertDialog(
-  //         title: const Text("Поздравляем!"),
-  //         content: Text("Вы перешли на новый уровень!\n\nУровень $oldLevel -> $newLevel"),
-  //         actions: [
-  //           TextButton(
-  //             onPressed: () => Navigator.pop(context),
-  //             child: const Text("Круто!"),
-  //           ),
-  //         ],
-  //       ),
-  //     );
-  //   }
-  // }
-
   @override
   void initState() {
     super.initState();
@@ -89,50 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   } 
 
-  // --- ЛОГИКА ПОВТОРЯЮЩИХСЯ ЗАДАЧ ---
-  // void _processRecurringTasks() {
-  //   bool changed = false;
-  //   // DateTime now = DateTime.now();
-  //   int earnedXp = 0;
-
-  //   // Ищем все выполненные задачи
-  //   for (var task in tasks.where((t) => t.isCompleted).toList()) {
-      
-  //     // ЛОГИКА АВТО-СДАЧИ:
-  //     // Если задача выполнена, мы забираем опыт и удаляем её (или обновляем, если повторяющаяся)
-      
-  //     // 1. Начисляем опыт за выполненную задачу
-  //     earnedXp += task.experience;
-
-  //     // 2. Если задача повторяющаяся, создаем её копию на следующий цикл
-  //     if (task.recurrence != Recurrence.none) {
-  //       // Задаче, которая была выполнена, назначаем дату следующего появления
-  //       task.nextOccurrence = _calculateNextOccurrence(task);
-  //       task.isCompleted = false; // Сбрасываем статус
-  //       task.completedAt = null;
-  //       task.dueDate = _calculateNextDueDate(task); // Новый дедлайн
-  //       // ВАЖНО: Мы НЕ добавляем её в tasks, если она должна появиться позже
-  //     } else {
-  //       // РАЗОВЫЕ: ПЕРЕНОСИМ В АРХИВ
-  //       completedArchive.add(task); 
-  //       tasks.remove(task);
-  //     }
-  //     changed = true;
-  //   }
-
-  //   if (changed) {
-  //     setState(() {
-  //       xp += earnedXp;
-  //     });
-  //     _saveData();
-  //     if (earnedXp > 0) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text("Автоматически сданы задачи! Получено опыта: $earnedXp")),
-  //       );
-  //     }
-  //   }
-  // }
-
   void _processRecurringTasks() {
     bool changed = false;
     DateTime now = DateTime.now();
@@ -155,26 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _saveData();
     }
   }
-
-  // // Активация задач, чей день настал
-  // void _checkAndGenerateTasks() {
-  //   DateTime now = DateTime.now();
-  //   bool added = false;
-
-  //   // Ищем задачи, которые были "отложены" (nextOccurrence не null и уже наступил)
-  //   // Для этого вам нужно хранить где-то список "будущих" задач или сканировать существующие
-  //   // Проще всего: при выполнении задачи мы НЕ удаляем её, а прячем (isCompleted = false, nextOccurrence = дата)
-    
-  //   // В данном случае, если вы храните все задачи в списке tasks:
-  //   for (var task in tasks.where((t) => !t.isCompleted && t.nextOccurrence != null).toList()) {
-  //     if (now.isAfter(task.nextOccurrence!)) {
-  //       task.nextOccurrence = null; // Делаем активной
-  //       added = true;
-  //     }
-  //   }
-    
-  //   if (added) setState(() {});
-  // }
 
   // Вспомогательный метод для расчета следующей даты
   DateTime _calculateNextDueDate(Task task) {
@@ -274,25 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Future<void> _processAchievementProgress() async {
-  //   // Увеличиваем глобальный счетчик в SharedPreferences
-  //   await AchievementManager.incrementTotalCompletions();
-  // }
-
-  // void _toggleTask(int index) {
-  //   final task = tasks[index];
-    
-  //   setState(() {
-  //     if (!task.isCompleted) {
-  //       task.isCompleted = true;
-  //       xp += task.experience;
-  //     } else {
-  //       task.isCompleted = false;
-  //       xp -= task.experience;
-  //     }
-  //     _saveData();
-  //   });
-  // }
   void _toggleTask(int index) {
     final task = tasks[index];
     
@@ -330,69 +224,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // void _updateCategories(List<Category> newCats) {
-  //   setState(() {
-  //     categories = newCats;
-  //   });
-  //   _saveCategories(); // Сохраняем в SharedPreferences каждый раз при изменении
-  // }
-
-  // void _deleteCompletedTasks() {
-  //   if (pendingXp == 0) return;
-  //   showDialog(
-  //     context: context,
-  //     builder: (BuildContext context) => AlertDialog(
-  //       title: const Text("Подтверждение"),
-  //       content: Text("Сдать $pendingXp XP и удалить выполненные задачи?"),
-  //       actions: [
-  //         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Нет")),
-  //         TextButton(onPressed: () {
-  //           _performCleanup();
-  //           Navigator.pop(context);
-  //         }, child: const Text("Да")),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // Future<void> _performCleanup() async {
-  //   final earnedXp = pendingXp;
-  //   if (earnedXp == 0) return;
-
-  //   final oldXp = xp;
-
-  //   // Сначала обрабатываем задачи и обновляем счетчики
-  //   final finishedTasks = tasks.where((t) => t.isCompleted).toList();
-    
-  //   for (var task in finishedTasks) {
-  //     // Каждая сданная задача — это прогресс в достижениях
-  //     await AchievementManager.incrementTotalCompletions();
-      
-  //     if (task.recurrence != Recurrence.none) {
-  //       task.nextOccurrence = _calculateNextOccurrence(task);
-  //       task.dueDate = _calculateNextDueDate(task);
-  //       task.isCompleted = false;
-  //       task.completedAt = null;
-  //     } else {
-  //       completedArchive.add(task);
-  //       tasks.remove(task);
-  //     }
-  //   }
-
-  //   setState(() {
-  //     xp += earnedXp;
-  //   });
-    
-  //   await _checkAchievements();
-  //   _saveData();
-
-  //   _checkLevelUp(oldXp, xp);
-  //   if (mounted) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text("Задачи сданы! Получено опыта: $earnedXp")),
-  //     );
-  //   }
-  // }
   Future<void> _performCleanup() async {
     final finishedTasks = tasks.where((t) => t.isCompleted).toList();
     if (finishedTasks.isEmpty) return;
@@ -468,20 +299,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Future<void> _checkAchievements() async {
-  //   // Считаем сумму всех выполнений всех задач
-  //     int totalPerformances = await AchievementManager.getTotalCompletions();
-    
-  //   for (var ach in AchievementManager.achievements) {
-  //     bool earned = await AchievementManager.checkAchievement(ach, totalPerformances);
-  //     if (earned) {
-  //       // Показать уведомление о достижении
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text("Поздравляем! Достижение '${ach.title}' повышено!")),
-  //       );
-  //     }
-  //   }
-  // }
   Future<void> _checkAchievements() async {
     // 1. Получаем актуальные данные из хранилища один раз
     final int totalTasks = await AchievementManager.getTotalCompletions();

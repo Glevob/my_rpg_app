@@ -1,8 +1,15 @@
 // lib/models/task.dart
 import 'package:flutter/material.dart';
 
+// Перечисление (список вариантов) сложности задачи. 
+// Позволяет выбрать один из фиксированных вариантов: легкая, средняя, сложная, легендарная.
 enum TaskDifficulty { easy, medium, hard, legendary }
+
+// Перечисление вариантов повторения задачи (как часто она должна возвращаться).
 enum Recurrence { none, daily, weekly, monthly }
+
+// Расширение (extension) позволяет добавить новые функции к нашему перечислению Recurrence.
+// В данном случае мы создаем свойство, которое переводит английские статусы повторения на русский язык.
 extension RecurrenceExtension on Recurrence {
   String get nameRu {
     switch (this) {
@@ -15,14 +22,19 @@ extension RecurrenceExtension on Recurrence {
   }
 }
 
+// Чертеж (класс) для категории задач. Помогает группировать задачи (например, "Дом", "Работа").
 class Category {
-  String name;
-  int iconCode;
-  List<String> templates;
+  String name;           // Название категории (например, "Дом")
+  int iconCode;          // Код иконки, чтобы отображать картинку категории в приложении
+  List<String> templates;// Готовые шаблоны названий для быстрого создания задач в этой категории
 
+  // Инструкция по созданию категории (конструктор). Все поля обязательны (required).
   Category({required this.name, required this.iconCode, required this.templates});
 
+  // Превращает категорию в специальный текстовый формат (JSON), чтобы сохранить её в память телефона.
   Map<String, dynamic> toJson() => {'name': name, 'iconCode': iconCode, 'templates': templates};
+  
+  // Создает категорию из сохраненного на телефоне текста (JSON).
   factory Category.fromJson(Map<String, dynamic> json) => Category(
     name: json['name'],
     iconCode: json['iconCode'],
@@ -30,43 +42,48 @@ class Category {
   );
 }
 
+// Главный чертеж (класс) для отдельной задачи. Здесь хранится вся информация о ней.
 class Task {
-  String id;
-  String title;
-  int experience;
-  bool isCompleted;
-  TaskDifficulty difficulty;
-  DateTime? completedAt;
-  String? categoryName;
-  int? categoryIconCode;
-  DateTime? dueDate;
-  Recurrence recurrence;
+  String id;                 // Уникальный ID задачи (номер), чтобы программа могла её найти среди других
+  String title;              // Текст задачи (что нужно сделать, например, "Купить молоко")
+  int experience;            // Сколько опыта (XP) получит игрок за выполнение этой задачи
+  bool isCompleted;          // Статус: выполнена задача (true) или нет (false)
+  TaskDifficulty difficulty; // Сложность задачи (берется из enum TaskDifficulty выше)
+  DateTime? completedAt;     // Точная дата и время, когда задача была выполнена (может быть пустым — null)
+  String? categoryName;      // Название категории, к которой относится задача (может быть без категории)
+  int? categoryIconCode;     // Иконка категории (если она есть)
+  DateTime? dueDate;         // Крайний срок (дедлайн), до которого нужно выполнить задачу
+  Recurrence recurrence;     // Правило повторения (например, повторять ежедневно или нет)
+  
+  // Проверка: просрочена ли задача. Возвращает "да" (true) или "нет" (false).
   bool get isOverdue {
-    if (isCompleted) return false;
-    if (dueDate == null) return false;
-    if (recurrence != Recurrence.none) return false;
+    if (isCompleted) return false;      // Если задача уже выполнена, она не может быть просрочена
+    if (dueDate == null) return false;    // Если дедлайна вообще нет, она тоже не просрочена
+    if (recurrence != Recurrence.none) return false; // Повторяющиеся задачи здесь не считаем просроченными
 
-    // Сравниваем точное время до секунды
+    // Сравниваем точное время дедлайна с текущим моментом. Если дедлайн раньше сейчас — значит, просрочено.
     return dueDate!.isBefore(DateTime.now());
   }
-  DateTime? nextOccurrence;
-  int timesCompleted;
+  
+  DateTime? nextOccurrence;  // Дата следующего появления задачи (для повторяющихся)
+  int timesCompleted;        // Сколько раз за всё время играющий успешно завершал эту задачу
 
+  // Метод, который сдвигает дедлайн повторяющейся задачи на следующий день/неделю/месяц, если время вышло.
   void updateRecurringTaskDate() {
-  if (recurrence == Recurrence.none || isCompleted) return;
+  if (recurrence == Recurrence.none || isCompleted) return; // Если задача не повторяющаяся или уже выполнена, ничего не делаем
 
   final now = DateTime.now();
-    // Пока дата задачи меньше сегодняшней - сдвигаем её вперед
+    // Пока дедлайн задачи меньше сегодняшнего дня — сдвигаем его вперед на следующий цикл
     while (dueDate != null && dueDate!.isBefore(now)) {
       switch (recurrence) {
         case Recurrence.daily:
-          dueDate = dueDate!.add(const Duration(days: 1));
+          dueDate = dueDate!.add(const Duration(days: 1)); // Добавляем 1 день
           break;
         case Recurrence.weekly:
-          dueDate = dueDate!.add(const Duration(days: 7));
+          dueDate = dueDate!.add(const Duration(days: 7)); // Добавляем 7 дней (неделю)
           break;
         case Recurrence.monthly:
-          // Упрощенное добавление месяца
+          // Упрощенное добавление ровно одного месяца к дате
           dueDate = DateTime(dueDate!.year, dueDate!.month + 1, dueDate!.day);
           break;
         default:
@@ -75,6 +92,8 @@ class Task {
     }
   }
 
+  // Конструктор: инструкция по созданию задачи. 
+  // ID, текст и опыт — обязательны. Остальное имеет стандартные значения (по умолчанию).
   Task({
     required this.id, required this.title, required this.experience,
     this.isCompleted = false, this.difficulty = TaskDifficulty.easy,
@@ -83,6 +102,7 @@ class Task {
     this.nextOccurrence, this.timesCompleted = 0,
   });
 
+  // Превращает объект задачи в формат JSON (текст), чтобы записать её в память телефона.
   Map<String, dynamic> toJson() => {
     'id': id, 'title': title, 'experience': experience, 'isCompleted': isCompleted,
     'difficulty': difficulty.index, 'completedAt': completedAt?.toIso8601String(),
@@ -91,8 +111,9 @@ class Task {
     'nextOccurrence': nextOccurrence?.toIso8601String(), 'timesCompleted': timesCompleted,
   };
 
+  // Восстанавливает задачу из сохраненного на телефоне текста (JSON).
   factory Task.fromJson(Map<String, dynamic> json) => Task(
-    id: json['id'] ?? DateTime.now().toString(),
+    id: json['id'] ?? DateTime.now().toString(), // Если ID нет, создаем текущее время как уникальный текст
     title: json['title'], experience: json['experience'],
     isCompleted: json['isCompleted'] ?? false,
     difficulty: TaskDifficulty.values[json['difficulty'] ?? 0],
