@@ -21,7 +21,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int xp = 0;
-  List<Task> tasks = [];
+  // List<Task> tasks = [];
+  List<Task> regularTasks = [];     // Список обычных разовых задач
+  List<Task> recurringTasks = [];   // Отдельный список повторяющихся задач (шаблонов)
   List<Category> categories = [
     Category(name: "Дом", iconCode: Icons.home.codePoint, templates: ["Убраться", "Постирать белье"]),
     Category(name: "Работа", iconCode: Icons.work.codePoint, templates: ["Отчет", "Встреча"]),
@@ -42,7 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
     await AchievementManager.loadAllAchievements();
     _processRecurringTasks();
 
-    if (tasks.any((t) => t.isCompleted)) {
+    final allActive = [...regularTasks, ...recurringTasks];
+    if (allActive.any((t) => t.isCompleted)) {
       await _performCleanup(); 
     }
     
@@ -70,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     bool changed = false;
     DateTime now = DateTime.now();
 
-    for (var task in tasks) {
+    for (var task in recurringTasks) {
       // Если задача повторяющаяся, выполнена, и пришло время её "сбросить" 
       // (например, наступил следующий день)
       if (task.recurrence != Recurrence.none && task.isCompleted) {
@@ -125,24 +128,56 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- ЛОГИКА ДАННЫХ ---
+  // Future<void> _saveData() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.setInt('user_xp', xp);
+  //   await prefs.setString('tasks_list', json.encode(tasks.map((t) => t.toJson()).toList()));
+  //   // Сохранение архива
+  //   await prefs.setString('archive_list', json.encode(completedArchive.map((t) => t.toJson()).toList()));
+  // }
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('user_xp', xp);
-    await prefs.setString('tasks_list', json.encode(tasks.map((t) => t.toJson()).toList()));
-    // Сохранение архива
+    await prefs.setString('regular_tasks_list', json.encode(regularTasks.map((t) => t.toJson()).toList()));
+    await prefs.setString('recurring_tasks_list', json.encode(recurringTasks.map((t) => t.toJson()).toList()));
     await prefs.setString('archive_list', json.encode(completedArchive.map((t) => t.toJson()).toList()));
   }
 
+  // Future<void> _loadData() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   setState(() {
+  //     xp = prefs.getInt('user_xp') ?? 0;
+  //     final tasksString = prefs.getString('tasks_list');
+  //     if (tasksString != null) {
+  //       final List<dynamic> decoded = json.decode(tasksString);
+  //       tasks = decoded.map((item) => Task.fromJson(item)).toList();
+  //     }
+  //     // Загрузка архива
+  //     final archiveString = prefs.getString('archive_list');
+  //     if (archiveString != null) {
+  //       final List<dynamic> decoded = json.decode(archiveString);
+  //       completedArchive = decoded.map((item) => Task.fromJson(item)).toList();
+  //     }
+  //   });
+  // }
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    
     setState(() {
       xp = prefs.getInt('user_xp') ?? 0;
-      final tasksString = prefs.getString('tasks_list');
-      if (tasksString != null) {
-        final List<dynamic> decoded = json.decode(tasksString);
-        tasks = decoded.map((item) => Task.fromJson(item)).toList();
+      
+      final regularString = prefs.getString('regular_tasks_list');
+      if (regularString != null) {
+        final List<dynamic> decoded = json.decode(regularString);
+        regularTasks = decoded.map((item) => Task.fromJson(item)).toList();
       }
-      // Загрузка архива
+
+      final recurringString = prefs.getString('recurring_tasks_list');
+      if (recurringString != null) {
+        final List<dynamic> decoded = json.decode(recurringString);
+        recurringTasks = decoded.map((item) => Task.fromJson(item)).toList();
+      }
+
       final archiveString = prefs.getString('archive_list');
       if (archiveString != null) {
         final List<dynamic> decoded = json.decode(archiveString);
@@ -172,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // --- УПРАВЛЕНИЕ ЗАДАЧАМИ ---
   void _addTask(String title, int exp, TaskDifficulty diff, String? catName, int? catIcon, DateTime? dueDate, Recurrence recurrence, DateTime? nextOccur) {
     setState(() {
-      tasks.add(Task(
+      final newTask = Task(
         id: DateTime.now().toString(),
         title: title,
         experience: exp,
@@ -182,13 +217,18 @@ class _HomeScreenState extends State<HomeScreen> {
         dueDate: dueDate,
         recurrence: recurrence,
         nextOccurrence: nextOccur,
-      ));
+      );
+
+      if (recurrence == Recurrence.none) {
+        regularTasks.add(newTask);
+      } else {
+        recurringTasks.add(newTask);
+      }
       _saveData();
     });
   }
 
-  void _toggleTask(int index) {
-    final task = tasks[index];
+  void _toggleTask(Task task) {
     
     setState(() {
       // Просто переключаем состояние
@@ -211,21 +251,47 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Удалить задачу?"),
-        content: Text('Удалить "${task.title}"?'),
+        content: Text(
+          task.recurrence != Recurrence.none
+              ? "Это повторяющаяся задача. Она исчезнет на сегодня без начисления опыта."
+              : "Это действие нельзя отменить."
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Отмена")),
-          TextButton(onPressed: () {
-            setState(() => tasks.remove(task));
-            _saveData();
-            Navigator.pop(ctx);
-          }, child: const Text("Удалить", style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text("Отмена"),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                if (task.recurrence != Recurrence.none) {
+                  // Сбрасываем выполнение
+                  task.isCompleted = false;
+                  
+                  // Отодвигаем nextOccurrence на следующий период вперед, 
+                  // чтобы задача мгновенно пропала с главного экрана (так как не пройдет условие visibleRecurring),
+                  // но осталась в общем списке recurringTasks как шаблон.
+                  task.nextOccurrence = _calculateNextOccurrence(task);
+                  task.dueDate = _calculateNextDueDate(task);
+                } else {
+                  // Разовую задачу удаляем полностью
+                  regularTasks.remove(task);
+                }
+              });
+              
+              _saveData();
+              Navigator.pop(ctx);
+            },
+            child: const Text("Удалить", style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
   }
 
   Future<void> _performCleanup() async {
-    final finishedTasks = tasks.where((t) => t.isCompleted).toList();
+    final allActive = [...regularTasks, ...recurringTasks];
+    final finishedTasks = allActive.where((t) => t.isCompleted).toList();
     if (finishedTasks.isEmpty) return;
 
     int earnedXp = 0;
@@ -246,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         // Для разовых — архив и удаление
         completedArchive.add(task);
-        tasks.remove(task);
+        regularTasks.remove(task);
       }
     }
 
@@ -271,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
     DateTime now = DateTime.now();
     bool updated = false;
 
-    for (var task in tasks) {
+    for (var task in recurringTasks) {
       // Обновляем только повторяющиеся и НЕвыполненные задачи
       if (task.recurrence != Recurrence.none && !task.isCompleted && task.dueDate != null) {
         // Пока дата дедлайна меньше сегодня
@@ -342,10 +408,10 @@ class _HomeScreenState extends State<HomeScreen> {
       color: overdue ? Colors.red[50] : getDifficultyColor(task.difficulty),
       child: ListTile(
         // Блокируем нажатие и чекбокс для просроченных задач
-        onTap: overdue ? null : () => _toggleTask(tasks.indexOf(task)),
+        onTap: overdue ? null : () => _toggleTask(task),
         leading: Checkbox(
           value: task.isCompleted || overdue, 
-          onChanged: overdue ? null : (_) => _toggleTask(tasks.indexOf(task)),
+          onChanged: overdue ? null : (_) => _toggleTask(task),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,7 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  int get pendingXp => tasks.where((t) => t.isCompleted).fold(0, (sum, t) => sum + t.experience);
+  int get pendingXp => [...regularTasks, ...recurringTasks].where((t) => t.isCompleted).fold(0, (sum, t) => sum + t.experience);
 
   @override
   Widget build(BuildContext context) {
@@ -420,15 +486,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Разделение и сортировка
     // Сначала фильтруем только те, которые должны быть видны сейчас
-    final visibleTasks = tasks.where((t) => 
+    final visibleRecurring = recurringTasks.where((t) => 
       t.nextOccurrence == null || DateTime.now().isAfter(t.nextOccurrence!)
     ).toList();
 
+    final allVisible = [...regularTasks, ...visibleRecurring];
+
     // Теперь разделяем отфильтрованные задачи
-    final incomplete = visibleTasks.where((t) => !t.isCompleted).toList()
+    final incomplete = allVisible.where((t) => !t.isCompleted).toList()
       ..sort((a, b) => b.id.compareTo(a.id));
       
-    final completed = visibleTasks.where((t) => t.isCompleted).toList()
+    final completed = allVisible.where((t) => t.isCompleted).toList()
       ..sort((a, b) => (a.completedAt ?? DateTime(0)).compareTo(b.completedAt ?? DateTime(0)));
 
     return Scaffold(
@@ -445,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSelected: (value) async {
                   if (value == 'recurring') {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => RecurringTasksScreen(
-                      tasks: tasks,
+                      tasks: recurringTasks,
                       onUpdate: () { _saveData(); setState(() {}); },
                     )));
                   } else if (value == 'stats') {
@@ -454,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     int totalCount = await AchievementManager.getTotalCompletions();
                     if (!mounted) return;
                     Navigator.push(context, MaterialPageRoute(builder: (_) => StatisticsScreen(
-                      tasks: tasks, // Передаем список активных задач
+                      tasks: [...regularTasks, ...recurringTasks], // Передаем список активных задач
                       archive: completedArchive,
                       totalXp: xp,
                       totalCompletedCount: totalCount,
